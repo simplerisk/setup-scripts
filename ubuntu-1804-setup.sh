@@ -10,7 +10,7 @@ echo "Updating the latest packages..."
 #unset UCF_FORCE_CONFFOLD
 #export UCF_FORCE_CONFFNEW=YES
 #ucf --purge /var/run/grub/menu.lst
-apt-get update -qq
+#apt-get update -qq
 #echo y | apt-get dist-upgrade -qq --force-yes
 
 echo "Installing new packages..."
