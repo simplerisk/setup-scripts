@@ -106,6 +106,10 @@ exec_cmd "service apache2 restart > /dev/null 2>&1"
 
 print_status "Configuring MySQL..."
 exec_cmd "echo -n \"sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"\" >> /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
+# THIS IS NOT WORKING
+# NEED TO ADD MYSQL ROOT CONFIG
+# NEED TO ADD SIMPLERISK DATABASE CONFIG
+# NEED TO CONFIG SIMPLERISK WITH DATABASE DETAILS
 
 print_status "Restarting MySQL to load the new configuration..."
 exec_cmd "service mysql restart > /dev/null 2>&1"
@@ -130,4 +134,10 @@ exec_cmd "ufw --force enable > /dev/null 2>&1"
 }
 
 ## Defer setup until we have the complete script
-setup
+if [[ $EUID -ne 0 ]]; then
+   print_status "ERROR: This script must be run as root!" 
+   print_status "Try running the command 'sudo bash' and then run this script again..."
+   exit 1
+else
+   setup
+fi
