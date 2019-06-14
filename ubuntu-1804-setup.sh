@@ -33,7 +33,7 @@ exec_cmd_nobail() {
 setup(){
 
 # Get the current SimpleRisk release version
-CURRENT_SIMPLERISK_VERSION=`curl -SL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
 
 print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
