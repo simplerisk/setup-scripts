@@ -13,15 +13,15 @@ echo "Installing lamp-server..."
 tasksel install lamp-server
 
 echo "Installing mbstring module for PHP..."
-apt-get install php-mbstring
+yes "" | apt-get install php-mbstring
 
 echo "Installing ldap module for PHP..."
-apt-get install php-ldap
+yes "" | apt-get install php-ldap
 
 echo "Installing mcrypt module for PHP..."
-apt-get install php-pear
+yes "" | apt-get install php-pear
 pecl channel-update pecl.php.net
-apt install php-dev libmcrypt-dev php-pear
+yes "" | apt install php-dev libmcrypt-dev php-pear
 yes "" | pecl install mcrypt-1.0.1
 
 #echo "Updating the latest packages..."
