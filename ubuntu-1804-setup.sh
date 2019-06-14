@@ -46,54 +46,45 @@ exec_cmd "tasksel install lamp-server > /dev/null 2>&1"
 print_status "Installing mbstring module for PHP..."
 exec_cmd "apt-get install -y php-mbstring > /dev/null 2>&1"
 
-print_status "Installing ldap module for PHP..."
-exec_cmd "apt-get install -y php-ldap > /dev/null 2>&1"
+print_status "Installing PHP development libraries..."
+exec_cmd "apt-get install -y php-dev > /dev/null 2>&1"
 
 print_status "Installing pear for PHP..."
-exec_cmd "apt-get install -y php-pear php-dev libmcrypt-dev > /dev/null 2>&1"
+exec_cmd "apt-get install -y php-pear > /dev/null 2>&1"
 
 print_status "Updating pear for PHP..."
 exec_cmd "pecl channel-update pecl.php.net > /dev/null 2>&1"
 
 print_status "Installing mcrypt module for PHP..."
+exec_cmd "apt-get install -y libmcrypt-dev > /dev/null 2>&1"
 exec_cmd "pecl install mcrypt-1.0.1 > /dev/null 2>&1"
 
-#echo "Updating the latest packages..."
-#unset UCF_FORCE_CONFFOLD
-#export UCF_FORCE_CONFFNEW=YES
-#ucf --purge /var/run/grub/menu.lst
-#apt-get update -qq
-#echo y | apt-get dist-upgrade -qq --force-yes
+print_status "Enabling the mcrypt extension in PHP..."
+exec_cmd "sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
+exec_cmd "sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/cli/php.ini > /dev/null 2>&1"
 
-#echo "Installing the 
-#echo "Installing new packages..."
-#apt-get -y install apache2 php php-mysql php-json mysql-client php-dev libmcrypt-dev php-pear php-ldap php7.2-mbstring
-#pecl channel-update pecl.php.net
-#yes '' | pecl install mcrypt-1.0.1
+print_status "Installing ldap module for PHP..."
+exec_cmd "apt-get install -y php-ldap > /dev/null 2>&1"
 
-#echo "Enabling the mcrypt extension in PHP..."
-#sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/apache2/php.ini
-#sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/cli/php.ini
+print_status "Enabling the ldap module in PHP..."
+exec_cmd "phpenmod ldap > /dev/null 2>&1"
 
-#echo "Enabling the ldap module in PHP..."
-#phpenmod ldap
+print_status "Enabling SSL for Apache..."
+exec_cmd "a2enmod rewrite > /dev/null 2>&1"
+exec_cmd "a2enmod ssl > /dev/null 2>&1"
+exec_cmd "a2ensite default-ssl > /dev/null 2>&1"
 
-#echo "Enabling SSL for Apache..."
-#a2enmod rewrite
-#a2enmod ssl
-#a2ensite default-ssl
+print_status "Configuring secure settings for Apache..."
+exec_cmd "sed -i 's/SSLProtocol all -SSLv3/SSLProtocol TLSv1.2/g' /etc/apache2/mods-enabled/ssl.conf > /dev/null 2>&1"
+exec_cmd "sed -i 's/#SSLHonorCipherOrder on/SSLHonorCipherOrder on/g' /etc/apache2/mods-enabled/ssl.conf > /dev/null 2>&1"
+exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf > /dev/null 2>&1"
+exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf > /dev/null 2>&1"
 
-#echo "Configuring secure settings for Apache..."
-#sed -i 's/SSLProtocol all -SSLv3/SSLProtocol TLSv1.2/g' /etc/apache2/mods-enabled/ssl.conf
-#sed -i 's/#SSLHonorCipherOrder on/SSLHonorCipherOrder on/g' /etc/apache2/mods-enabled/ssl.conf
-#sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf
-#sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf
+print_status "Setting the maximum file upload size in PHP to 5MB..."
+exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
 
-#echo "Setting the maximum file upload size in PHP to 5MB..."
-#sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini
-
-#echo "Restarting Apache to reload the new configuration..."
-#service apache2 restart
+print_status "Restarting Apache to reload the new configuration..."
+exec_cmd "service apache2 restart > /dev/null 2>&1"
 
 #echo "Downloading the latest SimpleRisk release..."
 #cd /var/www/html
@@ -110,6 +101,17 @@ exec_cmd "pecl install mcrypt-1.0.1 > /dev/null 2>&1"
 #ufw allow http
 #ufw allow https
 #echo "y" | ufw enable
+
+#echo "Updating the latest packages..."
+#unset UCF_FORCE_CONFFOLD
+#export UCF_FORCE_CONFFNEW=YES
+#ucf --purge /var/run/grub/menu.lst
+#apt-get update -qq
+#echo y | apt-get dist-upgrade -qq --force-yes
+
+#echo "Installing the
+#echo "Installing new packages..."
+#apt-get -y install apache2 php php-mysql php-json mysql-client php-dev libmcrypt-dev php-pear php-ldap php7.2-mbstring
 
 }
 
