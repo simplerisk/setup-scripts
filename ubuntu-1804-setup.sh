@@ -35,25 +35,28 @@ exec_cmd_nobail() {
 setup(){
 
 print_status "Populating apt-get cache..."
-exec_cmd 'apt-get update'
+exec_cmd 'apt-get update > /dev/null 2>&1'
 
 print_status "Installing tasksel..."
 exec_cmd "apt-get install -y tasksel > /dev/null 2>&1"
 
 print_status "Installing lamp-server..."
-exec_cmd "tasksel install lamp-server"
+exec_cmd "tasksel install lamp-server > /dev/null 2>&1"
 
-#echo "Installing mbstring module for PHP..."
-#yes "" | apt-get install php-mbstring
+print_status "Installing mbstring module for PHP..."
+exec_cmd "apt-get install -y php-mbstring > /dev/null 2>&1"
 
-#echo "Installing ldap module for PHP..."
-#yes "" | apt-get install php-ldap
+print_status "Installing ldap module for PHP..."
+exec_cmd "apt-get install -y php-ldap > /dev/null 2>&1"
 
-#echo "Installing mcrypt module for PHP..."
-#yes "" | apt-get install php-pear
-#pecl channel-update pecl.php.net
-#yes "" | apt install php-dev libmcrypt-dev php-pear
-#yes "" | pecl install mcrypt-1.0.1
+print_status "Installing pear for PHP..."
+exec_cmd "apt-get install -y php-pear php-dev libmcrypt-dev > /dev/null 2>&1"
+
+print_status "Updating pear for PHP..."
+exec_cmd "pecl channel-update pecl.php.net > /dev/null 2>&1"
+
+print_status "Installing mcrypt module for PHP..."
+exec_cmd "pecl install mcrypt-1.0.1 > /dev/null 2>&1"
 
 #echo "Updating the latest packages..."
 #unset UCF_FORCE_CONFFOLD
