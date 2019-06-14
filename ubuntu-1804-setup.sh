@@ -123,7 +123,7 @@ exec_cmd "mysql -uroot mysql -e \"UPDATE user SET authentication_string=PASSWORD
 exec_cmd "mysql -uroot mysql -e \"FLUSH PRIVILEGES\""
 
 print_status "Setting the SimpleRisk database password..."
-exec_cmd "sed -i 's/DB_PASSWORD\\', \\'simplerisk/DB_PASSWORD\\', \\'${MYSQL_SIMPLERISK_PASSWORD}/' /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
+exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
 
 print_status "Restarting MySQL to load the new configuration..."
 exec_cmd "service mysql restart > /dev/null 2>&1"
