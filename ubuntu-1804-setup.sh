@@ -105,10 +105,10 @@ print_status "Restarting Apache to load the new configuration..."
 exec_cmd "service apache2 restart > /dev/null 2>&1"
 
 print_status "Configuring MySQL..."
+NEW_MYSQL_ROOT_PASSWORD=`pwgen -c -n -1 20` > /dev/null 2>&1
+MYSQL_SIMPLERISK_PASSWORD=`pwgen -c -n -1 20` > /dev/null 2>&1
 exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
 exec_cmd "apt-get install -y pwgen > /dev/null 2>&1"
-exec_cmd "NEW_MYSQL_ROOT_PASSWORD=`pwgen -c -n -1 20` > /dev/null 2>&1"
-exec_cmd "MYSQL_SIMPLERISK_PASSWORD=`pwgen -c -n -1 20` > /dev/null 2>&1"
 exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
 exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
@@ -127,9 +127,7 @@ exec_cmd "ufw allow http > /dev/null 2>&1"
 exec_cmd "ufw allow https > /dev/null 2>&1"
 exec_cmd "ufw --force enable > /dev/null 2>&1"
 
-print_status "INSTALLATION COMPLETED SUCCESSFULLY"
-print_status "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}"
-print_status "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}"
+print_status "INSTALLATION COMPLETED SUCCESSFULLY\nMYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}\nMYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}"
 
 #echo "Updating the latest packages..."
 #unset UCF_FORCE_CONFFOLD
