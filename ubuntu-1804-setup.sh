@@ -1,3 +1,9 @@
+###########################################
+# SIMPLERISK SETUP SCRIPT FOR UBUNTU 18.04
+# Run with the command: 
+# curl https://raw.githubusercontent.com/simplerisk/setup-scripts/master/ubuntu-1804-setup.sh | bash -s
+###########################################
+
 CURRENT_SIMPLERISK_VERSION="20190331-001"
 
 echo "Updating to the latest packages..."
@@ -50,4 +56,4 @@ echo "Enabling UFW firewall..."
 ufw allow ssh
 ufw allow http
 ufw allow https
-ufw enable
+echo "y" | ufw enable
