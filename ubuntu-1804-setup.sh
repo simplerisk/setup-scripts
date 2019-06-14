@@ -90,15 +90,30 @@ print_status "Restarting Apache to reload the new configuration..."
 exec_cmd "service apache2 restart > /dev/null 2>&1"
 
 print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
-exec_cmd "cd /var/www > /dev/null 2>&1"
-exec_cmd "rm -r html > /dev/null 2>&1"
+exec_cmd "cd /var/www"
+exec_cmd "rm -r /var/www/html"
 exec_cmd "wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
 exec_cmd "tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
-exec_cmd "rm simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz
-exec_cmd "cd simplerisk > /dev/null 2>&1"
+exec_cmd "rm /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz
+exec_cmd "cd /var/www/simplerisk"
 exec_cmd "wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
 exec_cmd "tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
-exec_cmd "rm simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+exec_cmd "rm /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+
+print_status "Configuring Apache..."
+exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf > /dev/null 2>&1"
+exec_cmd "sed -i '/^<\/VirtualHost>/i \\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf > /dev/null 2>&1"
+exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf > /dev/null 2>&1"
+exec_cmd "sed -i '/<\/Directory>/a \\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf > /dev/null 2>&1"
+
+print_status "Restarting Apache..."
+exec_cmd "service apache2 restart > /dev/null 2>&1"
+
+print_status "Configuring MySQL..."
+exec_cmd "echo -n \"sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"\" >> /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
+
+print_status "Restarting MySQL..."
+exec_cmd "service mysql restart > /dev/null 2>&1"
 
 print_status "Enabling UFW firewall..."
 exec_cmd "ufw allow ssh > /dev/null 2>&1"
