@@ -86,18 +86,13 @@ exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-
 print_status "Setting the maximum file upload size in PHP to 5MB..."
 exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
 
-print_status "Restarting Apache to reload the new configuration..."
-exec_cmd "service apache2 restart > /dev/null 2>&1"
-
 print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
-exec_cmd "cd /var/www"
 exec_cmd "rm -r /var/www/html"
-exec_cmd "wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
-exec_cmd "tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
 exec_cmd "rm /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz
-exec_cmd "cd /var/www/simplerisk"
-exec_cmd "wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
-exec_cmd "tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
 exec_cmd "rm /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
 
 print_status "Configuring Apache..."
@@ -106,13 +101,13 @@ exec_cmd "sed -i '/^<\/VirtualHost>/i \\tRewriteEngine On\n\tRewriteCond %{HTTPS
 exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf > /dev/null 2>&1"
 exec_cmd "sed -i '/<\/Directory>/a \\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf > /dev/null 2>&1"
 
-print_status "Restarting Apache..."
+print_status "Restarting Apache to load the new configuration..."
 exec_cmd "service apache2 restart > /dev/null 2>&1"
 
 print_status "Configuring MySQL..."
 exec_cmd "echo -n \"sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"\" >> /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
 
-print_status "Restarting MySQL..."
+print_status "Restarting MySQL to load the new configuration..."
 exec_cmd "service mysql restart > /dev/null 2>&1"
 
 print_status "Enabling UFW firewall..."
