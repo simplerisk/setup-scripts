@@ -32,6 +32,13 @@ exec_cmd_nobail() {
 
 setup(){
 
+## Check to make sure we are running as root
+if [[ $EUID -ne 0 ]]; then
+   print_status "ERROR: This script must be run as root!"
+   print_status "Try running the command 'sudo bash' and then run this script again..."
+   exit 1
+fi
+
 # Get the current SimpleRisk release version
 CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
 
@@ -143,10 +150,4 @@ print_status "INSTALLATION COMPLETED SUCCESSFULLY\nMYSQL ROOT PASSWORD: ${NEW_MY
 }
 
 ## Defer setup until we have the complete script then check to make sure we are running as root
-if [[ $EUID -ne 0 ]]; then
-   print_status "ERROR: This script must be run as root!" 
-   print_status "Try running the command 'sudo bash' and then run this script again..."
-   exit 1
-else
-   setup
-fi
+setup
