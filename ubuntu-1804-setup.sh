@@ -8,8 +8,6 @@
 # wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/ubuntu-1804-setup.sh | bash -
 ###########################################
 
-CURRENT_SIMPLERISK_VERSION="20190331-001"
-
 export DEBIAN_FRONTEND=noninteractive
 
 print_status() {
@@ -33,6 +31,13 @@ exec_cmd_nobail() {
 }
 
 setup(){
+
+# Get the current SimpleRisk release version
+CURRENT_SIMPLERISK_VERSION=`curl -SL https://updates.simplerisk.com/Current_Vers
+ion.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<
+' -f 1`
+
+print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
 print_status "Populating apt-get cache..."
 exec_cmd 'apt-get update > /dev/null 2>&1'
@@ -86,21 +91,22 @@ exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/ph
 print_status "Restarting Apache to reload the new configuration..."
 exec_cmd "service apache2 restart > /dev/null 2>&1"
 
-#echo "Downloading the latest SimpleRisk release..."
-#cd /var/www/html
-#wget https://github.com/simplerisk/bundles/raw/master/simplerisk-$CURRENT_SIMPLERISK_VERSION.tgz
-#tar xvzf simplerisk-$CURRENT_SIMPLERISK_VERSION.tgz
-#rm simplerisk-$CURRENT_SIMPLERISK_VERSION.tgz
-#cd simplerisk
-#wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-$CURRENT_SIMPLERISK_VERSION.tgz
-#tar xvzf simplerisk-installer-$CURRENT_SIMPLERISK_VERSION.tgz
-#rm simplerisk-installer-$CURRENT_SIMPLERISK_VERSION.tgz
+print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
+exec_cmd "cd /var/www > /dev/null 2>&1"
+exec_cmd "rm -r html > /dev/null 2>&1"
+exec_cmd "wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+exec_cmd "tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+exec_cmd "rm simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz
+exec_cmd "cd simplerisk > /dev/null 2>&1"
+exec_cmd "wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+exec_cmd "tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+exec_cmd "rm simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
 
-#echo "Enabling UFW firewall..."
-#ufw allow ssh
-#ufw allow http
-#ufw allow https
-#echo "y" | ufw enable
+print_status "Enabling UFW firewall..."
+exec_cmd "ufw allow ssh > /dev/null 2>&1"
+exec_cmd "ufw allow http > /dev/null 2>&1"
+exec_cmd "ufw allow https > /dev/null 2>&1"
+exec_cmd "ufw --force enable > /dev/null 2>&1"
 
 #echo "Updating the latest packages..."
 #unset UCF_FORCE_CONFFOLD
