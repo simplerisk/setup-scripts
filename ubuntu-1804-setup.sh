@@ -6,12 +6,12 @@
 
 CURRENT_SIMPLERISK_VERSION="20190331-001"
 
-echo "Updating to the latest packages..."
-unset UCF_FORCE_CONFFOLD
-export UCF_FORCE_CONFFNEW=YES
-ucf --purge /var/run/grub/menu.lst
+echo "Updating the latest packages..."
+#unset UCF_FORCE_CONFFOLD
+#export UCF_FORCE_CONFFNEW=YES
+#ucf --purge /var/run/grub/menu.lst
 apt-get update -qq
-echo y | apt-get dist-upgrade -qq --force-yes
+#echo y | apt-get dist-upgrade -qq --force-yes
 
 echo "Installing new packages..."
 apt-get -y install apache2 php php-mysql php-json mysql-client php-dev libmcrypt-dev php-pear php-ldap php7.2-mbstring
