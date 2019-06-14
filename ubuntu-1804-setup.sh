@@ -111,10 +111,13 @@ exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\
 print_status "Restarting Apache to load the new configuration..."
 exec_cmd "service apache2 restart > /dev/null 2>&1"
 
-print_status "Configuring MySQL..."
+print_status "Generating MySQL passwords..."
 exec_cmd "apt-get install -y pwgen > /dev/null 2>&1"
 NEW_MYSQL_ROOT_PASSWORD=`pwgen -c -n -1 20` > /dev/null 2>&1
 MYSQL_SIMPLERISK_PASSWORD=`pwgen -c -n -1 20` > /dev/null 2>&1
+print_status "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}\nMYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}"
+
+print_status "Configuring MySQL..."
 exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
 exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
