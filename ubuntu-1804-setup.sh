@@ -105,11 +105,18 @@ print_status "Restarting Apache to load the new configuration..."
 exec_cmd "service apache2 restart > /dev/null 2>&1"
 
 print_status "Configuring MySQL..."
-exec_cmd "echo -n \"sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"\" >> /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
-# THIS IS NOT WORKING
-# NEED TO ADD MYSQL ROOT CONFIG
-# NEED TO ADD SIMPLERISK DATABASE CONFIG
-# NEED TO CONFIG SIMPLERISK WITH DATABASE DETAILS
+exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
+exec_cmd "apt-get install -y pwgen > /dev/null 2>&1"
+exec_cmd "NEW_MYSQL_ROOT_PASSWORD=`pwgen -c -n -1 20` > /dev/null 2>&1"
+exec_cmd "MYSQL_SIMPLERISK_PASSWORD=`pwgen -c -n -1 20` > /dev/null 2>&1"
+exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
+exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+exec_cmd "mysql -uroot mysql -e \"UPDATE user SET authentication_string=PASSWORD(\"${NEW_MYSQL_ROOT_PASSWORD}\") WHERE user='root';\" > /dev/null 2>&1\"
+exec_cmd "mysql -uroot mysql -e \"FLUSH PRIVILEGES\""
+
+print_status "Setting the SimpleRisk database password..."
+exec_cmd "sed -i 's/DB_PASSWORD\', \'simplerisk/DB_PASSWORD\', \'${MYSQL_SIMPLERISK_PASSWORD}/' /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
 
 print_status "Restarting MySQL to load the new configuration..."
 exec_cmd "service mysql restart > /dev/null 2>&1"
@@ -119,6 +126,10 @@ exec_cmd "ufw allow ssh > /dev/null 2>&1"
 exec_cmd "ufw allow http > /dev/null 2>&1"
 exec_cmd "ufw allow https > /dev/null 2>&1"
 exec_cmd "ufw --force enable > /dev/null 2>&1"
+
+print_status "INSTALLATION COMPLETED SUCCESSFULLY"
+print_status "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}"
+print_status "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}"
 
 #echo "Updating the latest packages..."
 #unset UCF_FORCE_CONFFOLD
@@ -133,7 +144,7 @@ exec_cmd "ufw --force enable > /dev/null 2>&1"
 
 }
 
-## Defer setup until we have the complete script
+## Defer setup until we have the complete script then check to make sure we are running as root
 if [[ $EUID -ne 0 ]]; then
    print_status "ERROR: This script must be run as root!" 
    print_status "Try running the command 'sudo bash' and then run this script again..."
