@@ -47,7 +47,7 @@ print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 print_status "Populating apt-get cache..."
 exec_cmd 'apt-get update > /dev/null 2>&1'
 
-print_status "Updating current packages..."
+print_status "Updating current packages (this may take a bit)..."
 exec_cmd 'apt-get dist-upgrade -qq --force-yes > /dev/null 2>&1'
 
 print_status "Installing tasksel..."
@@ -142,13 +142,6 @@ exec_cmd "ufw --force enable > /dev/null 2>&1"
 
 print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
 print_status "INSTALLATION COMPLETED SUCCESSFULLY"
-
-#echo "Updating the latest packages..."
-#unset UCF_FORCE_CONFFOLD
-#export UCF_FORCE_CONFFNEW=YES
-#ucf --purge /var/run/grub/menu.lst
-#apt-get update -qq
-#echo y | apt-get dist-upgrade -qq --force-yes
 
 }
 
