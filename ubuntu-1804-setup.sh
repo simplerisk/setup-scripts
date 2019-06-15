@@ -47,6 +47,9 @@ print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 print_status "Populating apt-get cache..."
 exec_cmd 'apt-get update > /dev/null 2>&1'
 
+print_status "Updating current packages..."
+exec_cmd 'apt-get dist-upgrade > /dev/null 2>&1'
+
 print_status "Installing tasksel..."
 exec_cmd "apt-get install -y tasksel > /dev/null 2>&1"
 
