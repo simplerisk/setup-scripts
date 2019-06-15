@@ -48,7 +48,7 @@ print_status "Populating apt-get cache..."
 exec_cmd 'apt-get update > /dev/null 2>&1'
 
 print_status "Updating current packages..."
-exec_cmd 'apt-get dist-upgrade > /dev/null 2>&1'
+exec_cmd 'apt-get dist-upgrade -qq --force-yes > /dev/null 2>&1'
 
 print_status "Installing tasksel..."
 exec_cmd "apt-get install -y tasksel > /dev/null 2>&1"
@@ -127,8 +127,6 @@ exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
 exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
-#exec_cmd "mysql -uroot mysql -e \"UPDATE user SET authentication_string=PASSWORD('${NEW_MYSQL_ROOT_PASSWORD}') WHERE user='root'\""
-#exec_cmd "mysql -uroot mysql -e \"FLUSH PRIVILEGES\""
 
 print_status "Setting the SimpleRisk database password..."
 exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
@@ -151,10 +149,6 @@ print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 #ucf --purge /var/run/grub/menu.lst
 #apt-get update -qq
 #echo y | apt-get dist-upgrade -qq --force-yes
-
-#echo "Installing the
-#echo "Installing new packages..."
-#apt-get -y install apache2 php php-mysql php-json mysql-client php-dev libmcrypt-dev php-pear php-ldap php7.2-mbstring
 
 }
 
