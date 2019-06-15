@@ -123,7 +123,7 @@ exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /
 exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
 exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
-#exec_cmd "mysql -uroot mysql -e \"UPDATE user SET authentication_string=PASSWORD(\"${NEW_MYSQL_ROOT_PASSWORD}\") WHERE user='root';\" > /dev/null 2>&1\"
+exec_cmd "mysql -uroot mysql -e \"UPDATE user SET authentication_string=PASSWORD(\"${NEW_MYSQL_ROOT_PASSWORD}\") WHERE user='root'\" > /dev/null 2>&1\"
 #exec_cmd "mysql -uroot mysql -e \"FLUSH PRIVILEGES\""
 
 print_status "Setting the SimpleRisk database password..."
