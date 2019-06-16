@@ -186,7 +186,13 @@ hostname(){
 
 get_hostname(){
 	read -p "Hostname: " name < /dev/tty
-	os_detect $name
+
+	# If the hostname is empty
+	if [ -z "$name" ]; then
+		get_hostname
+	else
+		os_detect $name
+	fi
 }
 
 os_detect(){
