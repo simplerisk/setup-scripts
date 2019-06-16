@@ -187,7 +187,7 @@ get_hostname(){
 }
 
 os_detect(){
-	name = $2
+	name = $1
 
 	if [ -f /etc/os-release ]; then
 		# freedesktop.org and systemd
