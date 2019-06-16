@@ -211,6 +211,7 @@ os_detect(){
 
 	if [ $OS -eq "Ubuntu" ]
 		if [ $VER -eq "18.04" ]
+			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
 			setup_ubuntu_1804
 		fi
 	else
