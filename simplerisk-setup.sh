@@ -158,7 +158,7 @@ setup(){
 	echo "This script will install SimpleRisk on this sytem.  Are you sure that you would like to proceed?"
 	select answer in "Yes" "No"; do
 		case $answer in
-			Yes ) os_detect();;
+			Yes ) os_detect; break;;
 			No ) exit;;
 		esac
 	done
@@ -168,8 +168,8 @@ hostname(){
 	echo "Would you like to specify a hostname for this SimpleRisk instance?"
 	select $answer in "Yes" "No"; do
 		case $answer in
-			Yes ) get_hostname();;
-			No ) os_detect("");;
+			Yes ) get_hostname; break;;
+			No ) os_detect; break;;
 		esac
 	done
 }
@@ -177,7 +177,7 @@ hostname(){
 get_hostname(){
 	echo "Hostname: "
 	read hostname
-	os_detect(hostname)
+	os_detect
 }
 
 os_detect(hostname){
@@ -211,7 +211,7 @@ os_detect(hostname){
 
 	if [ $OS -eq "Ubuntu" ]
 		if [ $VER -eq "18.04" ]
-			setup_ubuntu_1804()
+			setup_ubuntu_1804
 		fi
 	else
 		echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
