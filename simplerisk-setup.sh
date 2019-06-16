@@ -155,7 +155,6 @@ setup(){
 	# Check to make sure we are running as root
 	check_root
 
-	echo "This script will install SimpleRisk on this sytem.  Are you sure that you would like to proceed?"
 	read -p "This script will install SimpleRisk on this sytem.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
 	case $answer in
 		Yes ) hostname; break;;
