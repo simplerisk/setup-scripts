@@ -189,13 +189,6 @@ get_hostname(){
 }
 
 os_detect(){
-	# Set the name if it exists
-	if [ -n "$1" ]; then
-		name = $1
-	else 
-		name = ""
-	fi
-
 	if [ -f /etc/os-release ]; then
 		# freedesktop.org and systemd
 		. /etc/os-release
@@ -231,7 +224,7 @@ os_detect(){
 	if [ "$OS" = "Ubuntu" ]; then
 		if [ "$VER" = "18.04" ]; then
 			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
-			setup_ubuntu_1804 $name
+			setup_ubuntu_1804 $*
 		fi
 	else
 		echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
