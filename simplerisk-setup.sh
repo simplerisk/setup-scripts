@@ -153,7 +153,7 @@ print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 
 setup(){
 	# Check to make sure we are running as root
-	check_root()
+	check_root
 
 	echo "This script will install SimpleRisk on this sytem.  Are you sure that you would like to proceed?"
 	select answer in "Yes" "No"; do
@@ -219,5 +219,5 @@ os_detect(hostname){
 	fi
 }
 
-## Defer setup until we have the complete script then check to make sure we are running as root
+## Defer setup until we have the complete script
 setup
