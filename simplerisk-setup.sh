@@ -164,6 +164,7 @@ setup(){
 		yes ) hostname; break;;
 		Y ) hostname; break;;
 		y ) hostname; break;;
+		* ) exit 1
 	esac
 	exit
 }
@@ -179,8 +180,8 @@ hostname(){
 		no ) os_detect; break;;
 		N ) os_detect; break;;
 		n ) os_detect; break;;
+		*) hostname; break;;
 	esac
-	hostname
 }
 
 get_hostname(){
