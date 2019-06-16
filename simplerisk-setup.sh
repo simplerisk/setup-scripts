@@ -156,27 +156,28 @@ setup(){
 	check_root
 
 	echo "This script will install SimpleRisk on this sytem.  Are you sure that you would like to proceed?"
-	select answer in "Yes" "No"; do
-		case $answer in
-			Yes ) os_detect; break;;
-			No ) exit;;
-		esac
+	read -p "Type \"Yes\" to proceed: " answer < /dev/tty
+	case $answer in
+		Yes ) os_detect; break;;
+		yes ) os_detect; break;;
+		y ) os_detect; break;;
+	esac
 	done
+	exit
 }
 
 hostname(){
 	echo "Would you like to specify a hostname for this SimpleRisk instance?"
-	select $answer in "Yes" "No"; do
-		case $answer in
-			Yes ) get_hostname; break;;
-			No ) os_detect; break;;
-		esac
+	read -p "[ Yes / No ]: " answer < /dev/tty
+	case $answer in
+		Yes ) get_hostname; break;;
+		No ) os_detect; break;;
+	esac
 	done
 }
 
 get_hostname(){
-	echo "Hostname: "
-	read hostname
+	read -p "Hostname: " hostname < /dev/tty
 	os_detect
 }
 
