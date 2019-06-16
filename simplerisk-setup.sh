@@ -112,11 +112,6 @@ setup_ubuntu_1804(){
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf > /dev/null 2>&1"
 	exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf > /dev/null 2>&1"
 
-        # If the name is set
-        if [ -n "$1" ]; then
-		print_status "This is where we would set the name to $1."
-        fi
-
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "service apache2 restart > /dev/null 2>&1"
 
@@ -160,39 +155,13 @@ setup(){
 
 	read -p "This script will install SimpleRisk on this sytem.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
 	case $answer in
-		Yes ) hostname; break;;
-		yes ) hostname; break;;
-		Y ) hostname; break;;
-		y ) hostname; break;;
+		Yes ) os_detect; break;;
+		yes ) os_detect; break;;
+		Y ) os_detect; break;;
+		y ) os_detect; break;;
 		* ) exit 1
 	esac
 	exit
-}
-
-hostname(){
-	read -p "Would you like to specify a hostname for this SimpleRisk instance? [ Yes / No ]: " answer < /dev/tty
-	case $answer in
-		Yes ) get_hostname; break;;
-		yes ) get_hostname; break;;
-		Y ) get_hostname; break;;
-		y ) get_hostname; break;;
-		No ) os_detect; break;;
-		no ) os_detect; break;;
-		N ) os_detect; break;;
-		n ) os_detect; break;;
-		*) hostname; break;;
-	esac
-}
-
-get_hostname(){
-	read -p "Hostname: " name < /dev/tty
-
-	# If the hostname is empty
-	if [ -z "$name" ]; then
-		get_hostname
-	else
-		os_detect $name
-	fi
 }
 
 os_detect(){
@@ -231,7 +200,7 @@ os_detect(){
 	if [ "$OS" = "Ubuntu" ]; then
 		if [ "$VER" = "18.04" ]; then
 			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
-			setup_ubuntu_1804 $*
+			setup_ubuntu_1804
 		fi
 	else
 		echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
