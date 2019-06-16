@@ -201,8 +201,12 @@ os_detect(){
 		VER=$(cat /etc/debian_version)
 	elif [ -f /etc/SuSe-release ]; then
 		# Older SuSE/etc.
+                echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
+                exit 1
 	elif [ -f /etc/redhat-release ]; then
 		# Older Red Hat, CentOS, etc.
+                echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
+                exit 1
 	else
 		# Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
 		OS=$(uname -s)
