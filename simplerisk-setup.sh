@@ -213,8 +213,8 @@ os_detect(){
 		VER=$(uname -r)
 	fi
 
-	if [ $OS -eq "Ubuntu" ]
-		if [ $VER -eq "18.04" ]
+	if [ $OS -eq "Ubuntu" ]; then
+		if [ $VER -eq "18.04" ]; then
 			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
 			setup_ubuntu_1804
 		fi
