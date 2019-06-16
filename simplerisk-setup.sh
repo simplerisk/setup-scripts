@@ -74,8 +74,13 @@ setup_ubuntu_1804(){
 	exec_cmd "pecl install mcrypt-1.0.1 > /dev/null 2>&1"
 
 	print_status "Enabling the mcrypt extension in PHP..."
-	exec_cmd "sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
-	exec_cmd "sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/cli/php.ini > /dev/null 2>&1"
+	# If the mcrypt extenion is not there yet
+	if [ ! grep -q "extension=mcrypt.so" /etc/php/7.2/apache2/php.ini ]; then
+		exec_cmd "sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
+	fi
+	if [ ! grep -q "extension=mcrypt.so" /etc/php/7.2/cli/php.ini ]; then
+		exec_cmd "sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/cli/php.ini > /dev/null 2>&1"
+	fi
 
 	print_status "Installing ldap module for PHP..."
 	exec_cmd "apt-get install -y php-ldap > /dev/null 2>&1"
@@ -108,9 +113,13 @@ setup_ubuntu_1804(){
 
 	print_status "Configuring Apache..."
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf > /dev/null 2>&1"
-	exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf > /dev/null 2>&1"
+	if [ ! grep -q "RewriteEngine On" /etc/apache2/sites-enabled/000-default.conf ]; then
+		exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf > /dev/null 2>&1"
+	fi
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf > /dev/null 2>&1"
-	exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf > /dev/null 2>&1"
+	if [ ! grep -q "AllowOverride all" /etc/apache2/sites-enabled/default-ssl.conf ]; then
+		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf > /dev/null 2>&1"
+	fi
 
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "service apache2 restart > /dev/null 2>&1"
