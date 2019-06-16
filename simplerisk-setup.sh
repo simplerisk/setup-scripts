@@ -160,6 +160,7 @@ setup(){
 	case $answer in
 		Yes ) os_detect; break;;
 		yes ) os_detect; break;;
+		Y ) os_detect; break;;
 		y ) os_detect; break;;
 	esac
 	exit
@@ -212,8 +213,8 @@ os_detect(){
 		VER=$(uname -r)
 	fi
 
-	if [ $OS -eq "Ubuntu" ]; then
-		if [ $VER -eq "18.04" ]; then
+	if [ "$OS" = "Ubuntu" ]; then
+		if [ "$VER" = "18.04" ]; then
 			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
 			setup_ubuntu_1804
 		fi
