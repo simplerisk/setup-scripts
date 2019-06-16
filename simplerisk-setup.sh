@@ -3,9 +3,9 @@
 ###########################################
 # SIMPLERISK SETUP SCRIPT FOR UBUNTU 18.04
 # Run as root or insert `sudo -E` before `bash`: 
-# curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/ubuntu-1804-setup.sh | bash -
+# curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
 # OR
-# wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/ubuntu-1804-setup.sh | bash -
+# wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
 ###########################################
 
 export DEBIAN_FRONTEND=noninteractive
@@ -180,7 +180,7 @@ get_hostname(){
 	os_detect
 }
 
-os_detect(hostname){
+os_detect(){
 	if [ -f /etc/os-release ]; then
 		# freedesktop.org and systemd
 		. /etc/os-release
