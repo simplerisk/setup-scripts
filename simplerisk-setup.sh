@@ -165,17 +165,17 @@ setup_centos_7(){
         print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
 	print_status "Updating packages with Yum..."
-	exec_cmd "yum -y update"
+	exec_cmd "yum -y update > /dev/null 2>&1"
 
 	print_status "Installing the Apache web server..."
-	exec_cmd "yum -y install httpd"
+	exec_cmd "yum -y install httpd > /dev/null 2>&1"
 
 	print_status "Installing PHP for Apache..."
-	exec_cmd "yum -y --enablerepo=remi,remi-php71 install httpd php php-common php-cli php-pear php-pdo php-xml php-mcrypt php-mbstring"
+	exec_cmd "yum -y --enablerepo=remi,remi-php71 install httpd php php-common php-cli php-pear php-pdo php-xml php-mcrypt php-mbstring  > /dev/null 2>&1"
 
         print_status "Enabling and starting the Apache web server..."
-        exec_cmd "systemctl enable httpd"
-        exec_cmd "systemctl start httpd"
+        exec_cmd "systemctl enable httpd > /dev/null 2>&1"
+        exec_cmd "systemctl start httpd > /dev/null 2>&1"
 
         print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
         exec_cmd "rm -rf /var/www/html"
@@ -201,11 +201,11 @@ setup_centos_7(){
 	echo "</VirtualHost>" >> /etc/httpd/sites-enabled/simplerisk.conf
 
 	print_status "Installing the MariaDB database server..."
-	exec_cmd "yum -y install mariadb-server"
+	exec_cmd "yum -y install mariadb-server > /dev/null 2>&1"
 
 	print_status "Enabling and starting the MariaDB database server..."
-	exec_cmd "systemctl enable mariadb"
-	exec_cmd "systemctl start mariadb"
+	exec_cmd "systemctl enable mariadb > /dev/null 2>&1"
+	exec_cmd "systemctl start mariadb > /dev/null 2>&1"
 
         print_status "Generating MySQL passwords..."
         NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
@@ -215,7 +215,7 @@ setup_centos_7(){
         chmod 600 /root/passwords.txt
 
         print_status "Configuring MySQL..."
-        exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
+        #exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
         exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
         exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
         exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
