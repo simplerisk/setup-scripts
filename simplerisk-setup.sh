@@ -158,6 +158,10 @@ setup_ubuntu_1804(){
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
+setup_centos_7(){
+	echo "TEST"
+}
+
 setup(){
 	# Check to make sure we are running as root
 	check_root
@@ -206,6 +210,11 @@ os_detect(){
 		if [ "$VER" = "18.04" ]; then
 			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
 			setup_ubuntu_1804
+		fi
+	elif [ "$OS" = "CentOS Linux" ]; then
+		if [ "$VER" = "7" ]; then
+			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
+			setup_centos_7
 		fi
 	else
 		echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
