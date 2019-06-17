@@ -164,7 +164,7 @@ setup_centos_7(){
 
         print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
-	print_status "Updating packages with Yum..."
+	print_status "Updating packages with yum..."
 	exec_cmd "yum -y update > /dev/null 2>&1"
 
 	print_status "Installing the Apache web server..."
@@ -219,7 +219,11 @@ setup_centos_7(){
         exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
         exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
         exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
-        exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+	exec_cmd "mysql -uroot mysql -e \"DROP DATABASE test\""
+	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'localhost'\""
+	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'$(hostname)'\""
+	exec_cmd "mysql -uroot mysql -e \"UPDATE mysql.user SET Password = PASSWORD('${NEW_MYSQL_ROOT_PASSWORD}') WHERE User = 'root'\""
+        #exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
         print_status "Setting the SimpleRisk database password..."
         exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
