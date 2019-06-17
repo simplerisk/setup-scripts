@@ -159,7 +159,79 @@ setup_ubuntu_1804(){
 }
 
 setup_centos_7(){
-	echo "TEST"
+        # Get the current SimpleRisk release version
+        CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+
+        print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+
+	print_status "Updating packages with Yum..."
+	exec_cmd "yum -y update"
+
+	print_status "Installing the Apache web server..."
+	exec_cmd "yum -y install httpd"
+
+	print_status "Installing PHP for Apache..."
+	exec_cmd "yum -y --enablerepo=remi,remi-php71 install httpd php php-common php-cli php-pear php-pdo php-xml php-mcrypt php-mbstring"
+
+        print_status "Enabling and starting the Apache web server..."
+        exec_cmd "systemctl enable httpd"
+        exec_cmd "systemctl start httpd"
+
+        print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
+        exec_cmd "rm -rf /var/www/html"
+        exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+        exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+        exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+        exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+        exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+        exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "chown -R apache: /var/www/simplerisk"
+
+        print_status "Configuring Apache..."
+	exec_cmd "cd /etc/httpd && mkdir sites-available"
+	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
+	exec_cmd "echo \"IncludeOptional sites-enabled/*.conf\" >> /etc/httpd/conf/httpd.conf"
+	echo "<VirtualHost *>" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  <Directory \"/var/www/simplerisk/\">" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "    AllowOverride all" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "    allow from all" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "    Options -Indexes" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  </Directory>" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "</VirtualHost>" >> /etc/httpd/sites-enabled/simplerisk.conf
+
+	print_status "Installing the MariaDB database server..."
+	exec_cmd "yum -y install mariadb-server"
+
+	print_status "Enabling and starting the MariaDB database server..."
+	exec_cmd "systemctl enable mariadb"
+	exec_cmd "systemctl start mariadb"
+
+        print_status "Generating MySQL passwords..."
+        NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
+        MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
+        echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
+        echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
+        chmod 600 /root/passwords.txt
+
+        print_status "Configuring MySQL..."
+        exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
+        exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
+        exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+        exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+        exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+
+        print_status "Setting the SimpleRisk database password..."
+        exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
+
+        print_status "Restarting MySQL to load the new configuration..."
+        exec_cmd "systemctl restart mariadb > /dev/null 2>&1"
+
+        print_status "Removing the SimpleRisk install directory..."
+        exec_cmd "rm -r /var/www/simplerisk/install"
+
+        print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
+        print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
 setup(){
