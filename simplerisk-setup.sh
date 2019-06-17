@@ -164,13 +164,9 @@ setup(){
 
 	read -p "This script will install SimpleRisk on this sytem.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
 	case $answer in
-		Yes ) os_detect; break;;
-		yes ) os_detect; break;;
-		Y ) os_detect; break;;
-		y ) os_detect; break;;
-		* ) exit 1
+		Yes|yes|Y|y ) os_detect; break;;
+		* ) exit 1;;
 	esac
-	exit
 }
 
 os_detect(){
