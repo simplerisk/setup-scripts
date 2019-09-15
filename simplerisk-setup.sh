@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 ###########################################
 # SIMPLERISK SETUP SCRIPT FOR UBUNTU 18.04
 # Run as root or insert `sudo -E` before `bash`: 
@@ -7,7 +8,7 @@
 # OR
 # wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
 ###########################################
-
+set +e
 export DEBIAN_FRONTEND=noninteractive
 
 print_status() {
@@ -159,46 +160,59 @@ setup_ubuntu_1804(){
 }
 
 setup_centos_7(){
-        # Get the current SimpleRisk release version
-        CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+	# Get the current SimpleRisk release version
+	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
 
-        print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
 	print_status "Updating packages with yum..."
-	exec_cmd "yum -y update > /dev/null 2>&1"
+	exec_cmd "yum -y --skip-broken --nobest update > /dev/null 2>&1"
 
 	print_status "Installing the Apache web server..."
 	exec_cmd "yum -y install httpd > /dev/null 2>&1"
 
 	print_status "Installing PHP for Apache..."
-	exec_cmd "yum -y --enablerepo=remi,remi-php71 install httpd php php-common php-cli php-pear php-pdo php-xml php-mcrypt php-mbstring  > /dev/null 2>&1"
+	exec_cmd "yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+	exec_cmd "yum -y install yum-utils"
+	exec_cmd "subscription-manager  repos --enable=rhel-7-server-optional-rpms"
+	exec_cmd "yum-config-manger --enable remi-php72"
+	exec_cmd "yum update"
+	exec_cmd "yum search php72 | more"
+	exec_cmd "yum -y install php72"
 
-        print_status "Enabling and starting the Apache web server..."
-        exec_cmd "systemctl enable httpd > /dev/null 2>&1"
-        exec_cmd "systemctl start httpd > /dev/null 2>&1"
+	print_status "Enabling and starting the Apache web server..."
+	exec_cmd "systemctl enable httpd > /dev/null 2>&1"
+	exec_cmd "systemctl start httpd > /dev/null 2>&1"
 
-        print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
-        exec_cmd "rm -rf /var/www/html"
-        exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
-        exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
-        exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
-        exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
-        exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
-        exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
+	exec_cmd "rm -rf /var/www/html"
+	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
 	exec_cmd "chown -R apache: /var/www/simplerisk"
 
-        print_status "Configuring Apache..."
+	print_status "Configuring Apache..."
 	exec_cmd "cd /etc/httpd && mkdir sites-available"
 	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
 	exec_cmd "echo \"IncludeOptional sites-enabled/*.conf\" >> /etc/httpd/conf/httpd.conf"
-	echo "<VirtualHost *>" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "<VirtualHost *:80>" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "  <Directory \"/var/www/simplerisk/\">" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "    AllowOverride all" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "    allow from all" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "    Options -Indexes" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "  </Directory>" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  RewriteEngine On" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  RewriteCond %{HTTPS} off [OR]" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  RewriteRule ^/(.*) https://%{HTTPS_HOST}/$1 [NC,R=301,L]" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "</VirtualHost>" >> /etc/httpd/sites-enabled/simplerisk.conf
+
+	    if [ ! `grep -q "AllowOverride all" /etc/httpd/conf.d/ssl.conf` ]; then
+        exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/con.f/ssl.conf > /dev/null 2>&1"
+    fi
 
 	print_status "Installing the MariaDB database server..."
 	exec_cmd "yum -y install mariadb-server > /dev/null 2>&1"
@@ -207,35 +221,186 @@ setup_centos_7(){
 	exec_cmd "systemctl enable mariadb > /dev/null 2>&1"
 	exec_cmd "systemctl start mariadb > /dev/null 2>&1"
 
-        print_status "Generating MySQL passwords..."
-        NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
-        MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
-        echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
-        echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
-        chmod 600 /root/passwords.txt
+	print_status "Generating MySQL passwords..."
+	NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
+	MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
+	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
+	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
+	chmod 600 /root/passwords.txt
 
-        print_status "Configuring MySQL..."
-        #exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
-        exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
-        exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
-        exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	print_status "Configuring MySQL..."
+	#exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
+	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot mysql -e \"DROP DATABASE test\""
 	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'localhost'\""
 	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'$(hostname)'\""
 	exec_cmd "mysql -uroot mysql -e \"UPDATE mysql.user SET Password = PASSWORD('${NEW_MYSQL_ROOT_PASSWORD}') WHERE User = 'root'\""
-        #exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+	#exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
-        print_status "Setting the SimpleRisk database password..."
-        exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
+	print_status "Setting the SimpleRisk database password..."
+	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
 
-        print_status "Restarting MySQL to load the new configuration..."
-        exec_cmd "systemctl restart mariadb > /dev/null 2>&1"
+	print_status "Restarting MySQL to load the new configuration..."
+	exec_cmd "systemctl restart mariadb > /dev/null 2>&1"
 
-        print_status "Removing the SimpleRisk install directory..."
-        exec_cmd "rm -r /var/www/simplerisk/install"
+	print_status "Removing the SimpleRisk install directory..."
+	exec_cmd "rm -r /var/www/simplerisk/install"
 
-        print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
-        print_status "INSTALLATION COMPLETED SUCCESSFULLY"
+	print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
+	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
+}
+
+setup_rhel_8(){
+	# Get the current SimpleRisk release version
+	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+
+	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+
+	print_status "Updating packages with yum.  This can take several minutes to complete..."
+	exec_cmd "yum -y update > /dev/null 2>&1"
+
+	print_status "Installing the wget package..."
+	exec_cmd "yum -y install wget > /dev/null 2>&1"
+	
+	print_status "Installing Firewalld"
+	exec_cmd "yum -y install firewalld > /dev/null 2>&1"
+
+	print_status "Installing the Apache web server..."
+	exec_cmd "yum -y install httpd > /dev/null 2>&1"
+
+	print_status "Installing PHP for Apache..."
+	exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap > /dev/null 2>&1"
+	
+	print_status "Installing the MariaDB database server..."
+	exec_cmd "yum -y install mariadb-server > /dev/null 2>&1"
+	
+	print_status "Installing mod_ssl"
+	exec_cmd "yum -y install mod_ssl > /dev/null 2>&1"
+
+	print_status "Enabling and starting the Apache web server..."
+	exec_cmd "systemctl enable httpd > /dev/null 2>&1"
+	exec_cmd "systemctl start httpd > /dev/null 2>&1"
+
+	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
+	#exec_cmd "rm -rf /var/www/html > /dev/null 2>&1"
+	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "chown -R apache: /var/www/simplerisk"
+
+	print_status "Configuring Apache..."
+	exec_cmd "sed -i 's/#DocumentRoot \"\/var\/www\/html\"/DocumentRoot \"\/var\/www\/simplerisk\"/' /etc/httpd/conf.d/ssl.conf"
+	exec_cmd "cd /etc/httpd && mkdir sites-available"
+	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
+	exec_cmd "echo \"IncludeOptional sites-enabled/*.conf\" >> /etc/httpd/conf/httpd.conf"
+	echo "<VirtualHost *:80>" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  ErrorLog /var/log/httpd/error_log" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  CustomLog /var/log/httpd/access_log combined" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  <Directory \"/var/www/simplerisk/\">" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "    AllowOverride all" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "    allow from all" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "    Options -Indexes" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  </Directory>" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  RewriteEngine On" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  RewriteCond %{HTTPS} !=on" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "  RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "</VirtualHost>" >> /etc/httpd/sites-enabled/simplerisk.conf
+	
+	if [ ! `grep -q "AllowOverride all" /etc/httpd/conf.d/ssl.conf` ]; then
+    exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf > /dev/null 2>&1"
+    fi
+	print_status "Enabling and starting the MariaDB database server..."
+	exec_cmd "systemctl enable mariadb > /dev/null 2>&1"
+	exec_cmd "systemctl start mariadb > /dev/null 2>&1"
+
+	print_status "Generating MySQL passwords..."
+	NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
+	MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
+	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
+	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
+	chmod 600 /root/passwords.txt
+
+	print_status "Configuring MySQL..."
+	#exec_cmd "sed -i '$ a sql-mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
+	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	#exec_cmd "mysql -uroot mysql -e \"DROP DATABASE test\""
+	#exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'localhost'\""
+	#exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'$(hostname)'\""
+	exec_cmd "mysql -uroot mysql -e \"UPDATE mysql.user SET Password = PASSWORD('${NEW_MYSQL_ROOT_PASSWORD}') WHERE User = 'root'\""
+	#exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+
+	print_status "Setting the SimpleRisk database password..."
+	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
+
+	print_status "Restarting MySQL to load the new configuration..."
+	exec_cmd "systemctl restart mariadb > /dev/null 2>&1"
+
+	print_status "Removing the SimpleRisk install directory..."
+	exec_cmd "rm -r /var/www/simplerisk/install"
+		
+	print_status "Restarting Apache..."
+	exec_cmd "systemctl restart httpd"
+
+	#print_status "Disabling SELinux..."
+	#exec_cmd "sed -i \"s/SELINUX=enforcing/SELINUX=disabled/\" /etc/sysconfig/selinux > /dev/null 2>&1"
+	#exec_cmd "setenforce 0"
+		
+	print_status "Opening Firewall for HTTP/HTTPS traffic"
+	exec_cmd "systemctl enable firewalld"
+	exec_cmd "systemctl start firewalld"
+	exec_cmd "firewall-cmd --permanent --zone=public --add-service=http" 
+	exec_cmd "firewall-cmd --permanent --zone=public --add-service=https"
+	exec_cmd "firewall-cmd --permanent --zone=public --add-service=ssh"
+	exec_cmd "firewall-cmd --reload"
+	
+	print_status "Configuring SELinux for SimpleRisk"
+	exec_cmd "setsebool -P httpd_builtin_scripting=1"
+	exec_cmd "setsebool -P httpd_can_network_connect=1"
+	exec_cmd "setsebool -P httpd_can_sendmail=1"
+	exec_cmd "setsebool -P httpd_dbus_avahi=1"
+	exec_cmd "setsebool -P httpd_enable_cgi=1"
+	exec_cmd "setsebool -P httpd_read_user_content=1"
+	exec_cmd "setsebool -P httpd_tty_comm=1"
+	exec_cmd "setsebool -P allow_httpd_anon_write=0"
+	exec_cmd "setsebool -P allow_httpd_mod_auth_ntlm_winbind=0"
+	exec_cmd "setsebool -P allow_httpd_mod_auth_pam=0"
+	exec_cmd "setsebool -P allow_httpd_sys_script_anon_write=0"
+	exec_cmd "setsebool -P httpd_can_check_spam=0"
+	exec_cmd "setsebool -P httpd_can_network_connect_cobbler=0"
+	exec_cmd "setsebool -P httpd_can_network_connect_db=0"
+	exec_cmd "setsebool -P httpd_can_network_memcache=0"
+	exec_cmd "setsebool -P httpd_can_network_relay=0"
+	exec_cmd "setsebool -P httpd_dbus_sssd=0"
+	exec_cmd "setsebool -P httpd_enable_ftp_server=0"
+	exec_cmd "setsebool -P httpd_enable_homedirs=0"
+	exec_cmd "setsebool -P httpd_execmem=0"
+	exec_cmd "setsebool -P httpd_manage_ipa=0"
+	exec_cmd "setsebool -P httpd_run_preupgrade=0"
+	exec_cmd "setsebool -P httpd_run_stickshift=0"
+	exec_cmd "setsebool -P httpd_serve_cobbler_files=0"
+	exec_cmd "setsebool -P httpd_setrlimit=0"
+	exec_cmd "setsebool -P httpd_ssi_exec=0"
+	exec_cmd "setsebool -P httpd_tmp_exec=0"
+	exec_cmd "setsebool -P httpd_use_cifs=0"
+	exec_cmd "setsebool -P httpd_use_fusefs=0"
+	exec_cmd "setsebool -P httpd_use_gpg=0"
+	exec_cmd "setsebool -P httpd_use_nfs=0"
+	exec_cmd "setsebool -P httpd_use_openstack=0"
+	exec_cmd "setsebool -P httpd_verify_dns=0"
+
+	
+	
+		
+	print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
+	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
 setup(){
@@ -291,6 +456,11 @@ os_detect(){
 		if [ "$VER" = "7" ]; then
 			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
 			setup_centos_7
+		fi
+	elif [  "$OS" = "Red Hat Enterprise Linux" ]; then
+		if [ "$VER" = "8.0" ]; then
+			echo "Detected that we are running ${OS} ${VER}. Continuing with SimpleRisk Setup."
+			setup_rhel_8
 		fi
 	else
 		echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
