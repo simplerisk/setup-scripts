@@ -302,7 +302,7 @@ setup_centos_7(){
 	exec_cmd "setsebool -P httpd_use_nfs=0"
 	exec_cmd "setsebool -P httpd_use_openstack=0"
 	exec_cmd "setsebool -P httpd_verify_dns=0"
-	exec_cmd "chcon-R -t https_sys_rw_content_t /var/www/simplerisk"
+	exec_cmd "chcon -R -t https_sys_rw_content_t /var/www/simplerisk"
 
 	
 	print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
@@ -445,7 +445,7 @@ setup_rhel_8(){
 	exec_cmd "setsebool -P httpd_use_nfs=0"
 	exec_cmd "setsebool -P httpd_use_openstack=0"
 	exec_cmd "setsebool -P httpd_verify_dns=0"
-	exec_cmd "chcon-R -t https_sys_rw_content_t /var/www/simplerisk"
+	exec_cmd "chcon -R -t https_sys_rw_content_t /var/www/simplerisk"
 
 	
 	
