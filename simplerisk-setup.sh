@@ -454,15 +454,19 @@ setup_rhel_8(){
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
-setup(){
-	# Check to make sure we are running as root
-	check_root
-
+ask_user(){
 	read -p "This script will install SimpleRisk on this sytem.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
 	case $answer in
 		Yes|yes|Y|y ) os_detect;;
 		* ) exit 1;;
 	esac
+}
+
+setup(){
+	# Check to make sure we are running as root
+	check_root
+	# Ask user on how to proceed
+	ask_user	
 }
 
 os_detect(){
@@ -520,4 +524,4 @@ os_detect(){
 }
 
 ## Defer setup until we have the complete script
-setup
+setup 
