@@ -454,8 +454,34 @@ setup_rhel_8(){
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
+validate_args(){
+	## Default variables
+    NO_ASK=n
+
+    while [[ $# -gt 0 ]]
+    do
+        key="$1"
+        case $key in
+            -n|--no-ask)
+            NO_ASK=y 
+            shift 
+            ;;
+            *)    # unknown option
+            echo "Provided parameter $key is not valid. Stopping."
+            exit 1 
+            ;;
+        esac
+    done
+
+    if [ "$NO_ASK" = y ]; then
+        os_detect
+    else
+        ask_user
+    fi
+}
+
 ask_user(){
-	read -p "This script will install SimpleRisk on this sytem.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
+	read -p "This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
 	case $answer in
 		Yes|yes|Y|y ) os_detect;;
 		* ) exit 1;;
@@ -466,7 +492,7 @@ setup(){
 	# Check to make sure we are running as root
 	check_root
 	# Ask user on how to proceed
-	ask_user	
+	validate_args ${@:1}
 }
 
 os_detect(){
@@ -524,4 +550,4 @@ os_detect(){
 }
 
 ## Defer setup until we have the complete script
-setup 
+setup ${@:1}
