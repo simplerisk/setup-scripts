@@ -489,7 +489,7 @@ setup(){
 	# Check to make sure we are running as root
 	check_root
 	# Ask user on how to proceed
-	validate_args ${@:1}
+	validate_args "${@:1}"
 }
 
 os_detect(){
@@ -547,4 +547,4 @@ os_detect(){
 }
 
 ## Defer setup until we have the complete script
-setup ${@:1}
+setup "${@:1}"
