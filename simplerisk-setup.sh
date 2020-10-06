@@ -61,17 +61,11 @@ setup_ubuntu_1804(){
 	print_status "Installing mbstring module for PHP..."
 	exec_cmd "apt-get install -y php-mbstring > /dev/null 2>&1"
 
-        print_status "Installing curl module for PHP..."
-        exec_cmd "apt-get install -y php-curl > /dev/null 2>&1"
-
 	print_status "Installing PHP development libraries..."
 	exec_cmd "apt-get install -y php-dev > /dev/null 2>&1"
 
 	print_status "Installing pear for PHP..."
 	exec_cmd "apt-get install -y php-pear > /dev/null 2>&1"
-
-	print_status "Updating pear for PHP..."
-	exec_cmd "pecl channel-update pecl.php.net > /dev/null 2>&1"
 
 	print_status "Installing ldap module for PHP..."
 	exec_cmd "apt-get install -y php-ldap > /dev/null 2>&1"
@@ -91,8 +85,12 @@ setup_ubuntu_1804(){
 	exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf > /dev/null 2>&1"
 
 	print_status "Setting the maximum file upload size in PHP to 5MB..."
-	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
-
+	if [ "$VER" = "20.04" ]
+	then
+	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.4/apache2/php.ini > /dev/null 2>&1"
+	else
+		exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
+	fi
 	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
 	exec_cmd "rm -r /var/www/html"
 	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
@@ -128,7 +126,14 @@ setup_ubuntu_1804(){
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+###
+	if [ "$VER" = "20.04" ]
+	then
+		exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+       		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost'\""
+else
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	fi
 	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
 	print_status "Setting the SimpleRisk database password..."
