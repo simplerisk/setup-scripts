@@ -457,6 +457,142 @@ setup_rhel_8(){
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
+setup_suse_12(){
+	# Get the current SimpleRisk release version
+	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+
+	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+
+	print_status "Populating zypper cache..."
+	exec_cmd 'zypper --non-interactive update > /dev/null 2>&1'
+
+	print_status "Installing Apache..."
+	exec_cmd "zypper --non-interactive install apache2 > /dev/null 2>&1"
+	
+	print_status "Starting Apache..."
+	exec_cmd "systemctl start apache2 > /dev/null 2>&1"
+	
+	print_status "Enabling Apache on reboot..."
+	exec_cmd "systemctl enable apache2 > /dev/null 2>&1"
+
+	print_status "Installing MariaDB..."
+	exec_cmd "zypper --non-interactive install mariadb mariadb-client mariadb-tools > /dev/null 2>&1"
+
+	print_status "Starting MySQL..."
+	exec_cmd "systemctl start mysql > /dev/null 2>&1"
+
+	print_status "Enabling MySQL on reboot..."
+	exec_cmd "systemctl enable mysql > /dev/null 2>&1"
+
+	print_status "Installing PHP 7..."
+	exec_cmd "zypper --non-interactive install php7 php7-mysql apache2-mod_php7 php-ldap > /dev/null 2>&1"
+	exec_cmd "a2enmod php7 > /dev/null 2>&1"
+
+	print_status "Enabling SSL for Apache..."
+	exec_cmd "a2enmod rewrite > /dev/null 2>&1"
+	exec_cmd "a2enmod ssl > /dev/null 2>&1"
+	exec_cmd "a2enmod mod_ssl > /dev/null 2>&1"
+	
+	print_status "Enabling Rewrite Module for Apache..."
+	echo "LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so" >> /etc/apache2/loadmodule.conf
+
+	
+	print_status "Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert"
+	echo "Listen 443" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "<VirtualHost *:80>" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "  ErrorLog /var/log/apache2/error_log" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "  CustomLog /var/log/apache2/access_log combined" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "  <Directory \"/var/www/simplerisk/\">" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "    AllowOverride all" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "    Require all granted" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "    Options -Indexes" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "  </Directory>" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "  RewriteEngine On" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "  RewriteCond %{HTTPS} !=on" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "  RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]" >> /etc/apache2/vhosts.d/simplerisk.conf
+	echo "</VirtualHost>" >> /etc/apache2/vhosts.d/simplerisk.conf
+	
+	# Generate the OpenSSL private key
+	exec_cmd "openssl genrsa -des3 -passout pass:/passwords/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key"
+	exec_cmd "openssl rsa -passin pass:/passwords/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key"
+
+	# Remove the original key file
+	exec_cmd "rm /etc/apache2/ssl.key/simplerisk.pass.key"
+
+	# Generate the CSR
+	exec_cmd "openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out  /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk""
+
+	# Create the Certificate
+	exec_cmd "openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt"
+
+	echo "<VirtualHost *:443>" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "  ErrorLog /var/log/apache2/error_log" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "  CustomLog /var/log/apache2/access_log combined" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "  <Directory \"/var/www/simplerisk/\">" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "    AllowOverride all" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "    Require all granted" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "    Options -Indexes" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "  </Directory>" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "  SSLEngine on" >> /etc/apache2/vhosts.d/ssl.conf
+    echo "  SSLCertificateFile /etc/apache2/ssl.crt/simplerisk.crt" >> /etc/apache2/vhosts.d/ssl.conf
+    echo "  SSLCertificateKeyFile /etc/apache2/ssl.key/simplerisk.key" >> /etc/apache2/vhosts.d/ssl.conf
+    echo " #SSLCertificateChainFile /etc/apache2/ssl.crt/vhost-example-chain.crt" >> /etc/apache2/vhosts.d/ssl.conf
+	echo "</VirtualHost>" >> /etc/apache2/vhosts.d/ssl.conf
+
+	print_status "Configuring secure settings for Apache..."
+	sed -i 's/\(SSLProtocol\).*/\1 TLSv1.2/g' /etc/apache2/ssl-global.conf > /dev/null 2>&1                                  
+	sed -i 's/#\(SSLHonorCipherOrder\)/\1/g' /etc/apache2/ssl-global.conf > /dev/null 2>&1 
+//	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf > /dev/null 2>&1"
+//	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf > /dev/null 2>&1"
+
+	print_status "Setting the maximum file upload size in PHP to 5MB..."
+	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php7/apache2/php.ini > /dev/null 2>&1"
+
+	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
+	exec_cmd "mkdir /var/www/"
+	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "rm /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "rm /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"
+	exec_cmd "chown -R wwwrun: /var/www/simplerisk"
+
+	print_status "Restarting Apache to load the new configuration..."
+	exec_cmd "systemctl restart apache2 > /dev/null 2>&1"
+
+	print_status "Generating MySQL passwords..."
+	NEW_MYSQL_ROOT_PASSWORD=`openssl rand -base64 20` > /dev/null 2>&1
+	MYSQL_SIMPLERISK_PASSWORD=`openssl rand -base64 20` > /dev/null 2>&1
+	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
+	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
+	chmod 600 /root/passwords.txt
+
+	print_status "Configuring MySQL..."
+	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf > /dev/null 2>&1"
+	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'\""
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\""
+	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+	
+	print_status "Setting the SimpleRisk database password..."
+	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
+
+	print_status "Restarting MySQL to load the new configuration..."
+	exec_cmd "systemctl restart mysql > /dev/null 2>&1"
+
+	print_status "Removing the SimpleRisk install directory..."
+	exec_cmd "rm -r /var/www/simplerisk/install"
+
+	print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
+	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
+}
+
+
 validate_args(){
         while [[ $# -gt 0 ]]
         do
@@ -537,6 +673,11 @@ os_detect(){
 		if [ "$VER" = "7" ]; then
 			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
 			setup_centos_7
+		fi
+	elif [ "$OS" = "SLES" ]; then
+		if [ "$VER" = "12.5" ] || [ "$VER" = "12.4" ] || [ "$VER" = "12.3" ] || [ "$VER" = "12.2" ] || [ "$VER" = "12.1" ]; then
+			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
+			setup_suse_12
 		fi
 	elif [  "$OS" = "Red Hat Enterprise Linux" ]; then
 		if [ "$VER" = "8.0" ]; then
