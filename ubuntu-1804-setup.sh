@@ -59,6 +59,9 @@ exec_cmd "tasksel install lamp-server > /dev/null 2>&1"
 print_status "Installing mbstring module for PHP..."
 exec_cmd "apt-get install -y php-mbstring > /dev/null 2>&1"
 
+print_status "Installing curl module for PHP..."
+exec_cmd "apt-get install -y php-curl > /dev/null 2>&1"
+
 print_status "Installing PHP development libraries..."
 exec_cmd "apt-get install -y php-dev > /dev/null 2>&1"
 

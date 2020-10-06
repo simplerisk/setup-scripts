@@ -61,6 +61,9 @@ setup_ubuntu_1804(){
 	print_status "Installing mbstring module for PHP..."
 	exec_cmd "apt-get install -y php-mbstring > /dev/null 2>&1"
 
+        print_status "Installing curl module for PHP..."
+        exec_cmd "apt-get install -y php-curl > /dev/null 2>&1"
+
 	print_status "Installing PHP development libraries..."
 	exec_cmd "apt-get install -y php-dev > /dev/null 2>&1"
 
@@ -179,7 +182,7 @@ setup_centos_7(){
 	exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm > /dev/null 2>&1"
 	exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm > /dev/null 2>&1"
 	exec_cmd "yum -y --enablerepo=remi,remi-php71 install httpd php php-common > /dev/null 2>&1"
-	exec_cmd "yum -y --enablerepo=remi,remi-php71 install php-cli php-pear php-pdo php-mysqlnd php-gd php-mbstring php-mcrypt php-xml"
+	exec_cmd "yum -y --enablerepo=remi,remi-php71 install php-cli php-pear php-pdo php-mysqlnd php-gd php-mbstring php-mcrypt php-xml php-curl"
 
 	print_status "Installing mod_ssl"
 	exec_cmd "yum -y install mod_ssl > /dev/null 2>&1"
@@ -328,7 +331,7 @@ setup_rhel_8(){
 	exec_cmd "yum -y install httpd > /dev/null 2>&1"
 
 	print_status "Installing PHP for Apache..."
-	exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap > /dev/null 2>&1"
+	exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap php-curl > /dev/null 2>&1"
 	
 	print_status "Installing the MariaDB database server..."
 	exec_cmd "yum -y install mariadb-server > /dev/null 2>&1"
