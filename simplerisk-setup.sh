@@ -73,19 +73,6 @@ setup_ubuntu_1804(){
 	print_status "Updating pear for PHP..."
 	exec_cmd "pecl channel-update pecl.php.net > /dev/null 2>&1"
 
-	print_status "Installing mcrypt module for PHP..."
-	exec_cmd "apt-get install -y libmcrypt-dev > /dev/null 2>&1"
-	exec_cmd "pecl install mcrypt-1.0.1 > /dev/null 2>&1"
-
-	print_status "Enabling the mcrypt extension in PHP..."
-	# If the mcrypt extenion is not there yet
-	if [ ! `grep -q "extension=mcrypt.so" /etc/php/7.2/apache2/php.ini` ]; then
-		exec_cmd "sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
-	fi
-	if [ ! `grep -q "extension=mcrypt.so" /etc/php/7.2/cli/php.ini` ]; then
-		exec_cmd "sed -i '/^;extension=xsl/a extension=mcrypt.so' /etc/php/7.2/cli/php.ini > /dev/null 2>&1"
-	fi
-
 	print_status "Installing ldap module for PHP..."
 	exec_cmd "apt-get install -y php-ldap > /dev/null 2>&1"
 
