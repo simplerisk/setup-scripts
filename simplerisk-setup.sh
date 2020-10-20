@@ -134,8 +134,10 @@ setup_ubuntu_1804(){
 	then
 		exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
        		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost'\""
+		exec_cmd "mysql -uroot simplerisk -e \"UPDATE db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
 else
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	exec_cmd "mysql -uroot simplerisk -e \"UPDATE db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
 	fi
 	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
@@ -239,12 +241,13 @@ setup_centos_7(){
 	#exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot mysql -e \"DROP DATABASE test\""
 	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'localhost'\""
 	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'$(hostname)'\""
 	exec_cmd "mysql -uroot mysql -e \"UPDATE mysql.user SET Password = PASSWORD('${NEW_MYSQL_ROOT_PASSWORD}') WHERE User = 'root'\""
 	,exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+	exec_cmd "mysql -uroot simplerisk -e \"UPDATE db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
@@ -385,9 +388,10 @@ setup_rhel_8(){
 	#exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf > /dev/null 2>&1"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot mysql -e \"UPDATE mysql.user SET Password = PASSWORD('${NEW_MYSQL_ROOT_PASSWORD}') WHERE User = 'root'\""
 	#exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+	exec_cmd "mysql -uroot simplerisk -e \"UPDATE db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php > /dev/null 2>&1"
