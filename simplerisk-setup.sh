@@ -72,6 +72,9 @@ setup_ubuntu_1804(){
 
 	print_status "Enabling the ldap module in PHP..."
 	exec_cmd "phpenmod ldap > /dev/null 2>&1"
+	
+	print_status "Installing curl module for PHP..."
+	exec_cmd "apt-get install -y php-curl > /dev/null 2>&1"
 
 	print_status "Enabling SSL for Apache..."
 	exec_cmd "a2enmod rewrite > /dev/null 2>&1"
@@ -224,7 +227,7 @@ setup_centos_7(){
 	print_status "Enabling and starting the MariaDB database server..."
 	exec_cmd "systemctl enable mariadb > /dev/null 2>&1"
 	exec_cmd "systemctl start mariadb > /dev/null 2>&1"
-,,,
+
 	print_status "Generating MySQL passwords..."
 	NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
 	MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20` > /dev/null 2>&1
@@ -477,7 +480,7 @@ setup_suse_12(){
 	exec_cmd "systemctl enable mysql > /dev/null 2>&1"
 
 	print_status "Installing PHP 7..."
-	exec_cmd "zypper --non-interactive install php7 php7-mysql apache2-mod_php7 php-ldap > /dev/null 2>&1"
+	exec_cmd "zypper --non-interactive install php7 php7-mysql apache2-mod_php7 php-ldap php-curl > /dev/null 2>&1"
 	exec_cmd "a2enmod php7 > /dev/null 2>&1"
 
 	print_status "Enabling SSL for Apache..."
