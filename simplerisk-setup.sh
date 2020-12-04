@@ -484,7 +484,7 @@ setup_suse_12(){
 	exec_cmd "systemctl enable mysql > /dev/null 2>&1"
 
 	print_status "Installing PHP 7..."
-	exec_cmd "zypper --non-interactive install php7 php7-mysql apache2-mod_php7 php-ldap php-curl > /dev/null 2>&1"
+	exec_cmd "zypper --non-interactive install php7 php7-mysql apache2-mod_php7 php-ldap php-curl php-zlib php-phar php-mbstring > /dev/null 2>&1"
 	exec_cmd "a2enmod php7 > /dev/null 2>&1"
 
 	print_status "Enabling SSL for Apache..."
@@ -571,6 +571,7 @@ setup_suse_12(){
 
 	print_status "Configuring MySQL..."
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf > /dev/null 2>&1"
+	exec_cmd "sed -i 's/STRICT_TRANS_TABLES//g' /etc/my.cnf > /dev/null 2>&1"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
 	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'\""
