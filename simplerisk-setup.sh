@@ -592,43 +592,49 @@ setup_suse_12(){
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
-
-validate_args(){
-        while [[ $# -gt 0 ]]
-        do
-            key="$1"
-            case $key in
-                -n|--no-assistance)
-                HEADLESS=y 
-                shift 
-                ;;
-                *)    # unknown option
-                echo "Provided parameter $key is not valid. Stopping."
-                exit 1 
-                ;;
-            esac
-        done
-
-        if [ -n "$HEADLESS" ]; then
-            os_detect
-        else
-            ask_user
-        fi
+# $1 = OS
+# $2 = Version
+detected_os_proceed(){
+	echo "Detected that we are running ${1} ${2}. Continuing with SimpleRisk setup." 
 }
 
-ask_user(){
-	read -p "This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
-	case $answer in
-		Yes|yes|Y|y ) os_detect;;
-		* ) exit 1;;
+# $1 = OS
+# $2 = Version
+detected_os_but_unsupported_version(){
+	echo "Detected that we are running ${1} ${2}, but this version is not currently supported." && exit 1
+}
+
+# $1 = OS
+# $2 = Version
+validate_os(){
+	case "$1" in
+		"Ubuntu")
+			if [ "$2" = "18.04" ] || [ "$2" = "20.04" ]; then
+				detected_os_proceed "$1" "$2" #&& setup_ubuntu_1804 && exit 0
+			else
+				detected_os_but_unsupported_version "$1" "$2"
+			fi;;
+		"CentOS Linux")
+			if [ "$2" = "7" ]; then
+				detected_os_proceed "$1" "$2" #&& setup_centos_7 && exit 0
+			else
+				detected_os_but_unsupported_version "$1" "$2"
+			fi;;
+		"SLES")
+			if [ "$2" = "12.5" ] || [ "$2" = "12.4" ] || [ "$2" = "12.3" ] || [ "$2" = "12.2" ] || [ "$2" = "12.1" ]; then
+				detected_os_proceed "$1" "$2" #&& setup_suse_12 && exit 0
+			else
+				detected_os_but_unsupported_version "$1" "$2"
+			fi;;
+		"Red Hat Enterprise Linux")
+			if [ "$2" = "8.0" ] || [ "$2" = "8.1" ] || [ "$2" = "8.2" ] || [ "$2" = "8.3" ]; then
+				detected_os_proceed "$1" "$2" #&& setup_rhel_8 && exit 0
+			else
+				detected_os_but_unsupported_version "$1" "$2"
+			fi;;
+		*)
+			echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS. Exiting." && exit 1;;
 	esac
-}
-
-setup(){
-	# Check to make sure we are running as root
-	check_root
-	# Ask user on how to proceed
-	validate_args "${@:1}"
 }
 
 os_detect(){
@@ -664,30 +670,46 @@ os_detect(){
 		VER=$(uname -r)
 	fi
 
-	if [ "$OS" = "Ubuntu" ]; then
-		if [ "$VER" = "18.04" ] || [ "$VER" = "20.04" ]; then
-			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
-			setup_ubuntu_1804
-		fi
-	elif [ "$OS" = "CentOS Linux" ]; then
-		if [ "$VER" = "7" ]; then
-			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
-			setup_centos_7
-		fi
-	elif [ "$OS" = "SLES" ]; then
-		if [ "$VER" = "12.5" ] || [ "$VER" = "12.4" ] || [ "$VER" = "12.3" ] || [ "$VER" = "12.2" ] || [ "$VER" = "12.1" ]; then
-			echo "Detected that we are running ${OS} ${VER}.  Continuing with SimpleRisk setup."
-			setup_suse_12
-		fi
-	elif [  "$OS" = "Red Hat Enterprise Linux" ]; then
-		if [ "$VER" = "8.0" ]; then
-			echo "Detected that we are running ${OS} ${VER}. Continuing with SimpleRisk Setup."
-			setup_rhel_8
-		fi
+	validate_os "${OS}" "${VER}"
+}
+
+ask_user(){
+	read -p "This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
+	case $answer in
+		Yes|yes|Y|y ) os_detect;;
+		* ) exit 1;;
+	esac
+}
+
+validate_args(){
+	while [[ $# -gt 0 ]]
+	do
+		key="$1"
+		case $key in
+			-n|--no-assistance)
+				HEADLESS=y 
+				shift;;
+			-d|--debug)
+				DEBUG=y
+				shift;;
+			*)    # unknown option
+				echo "Provided parameter $key is not valid. Stopping."
+				exit 1;;
+		esac
+	done
+
+	if [ -n "$HEADLESS" ]; then
+		os_detect
 	else
-		echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
-		exit 1
+		ask_user
 	fi
+}
+
+setup(){
+	# Check to make sure we are running as root
+	check_root
+	# Ask user on how to proceed
+	validate_args "${@:1}"
 }
 
 ## Defer setup until we have the complete script
