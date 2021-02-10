@@ -50,6 +50,9 @@ setup_ubuntu_1804(){
 	print_status "Populating apt-get cache..."
 	exec_cmd 'apt-get update'
 
+	print_status "Waiting for the cache to be unlocked... (Needed for AWS)"
+	exec_cmd 'while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 1; done;'
+
 	print_status "Updating current packages (this may take a bit)..."
 	exec_cmd 'apt-get dist-upgrade -qq --force-yes'
 

@@ -9,7 +9,7 @@ pipeline {
 					}
 					steps {
 						sh '''
-							sudo ./simplerisk-setup.sh -n
+							sudo ./simplerisk-setup.sh -n -d
 						'''
 					}
 				}
@@ -19,7 +19,7 @@ pipeline {
 					}
 					steps {
 						sh '''
-							sudo ./simplerisk-setup.sh -n
+							sudo ./simplerisk-setup.sh -n -d
 						'''
 					}
 				}
@@ -29,7 +29,7 @@ pipeline {
 					}
 					steps {
 						sh '''
-							sudo ./simplerisk-setup.sh -n
+							sudo ./simplerisk-setup.sh -n -d
 						'''
 					}
 				}
@@ -39,7 +39,7 @@ pipeline {
 					}
 					steps {
 						sh '''
-							sudo ./simplerisk-setup.sh -n
+							sudo ./simplerisk-setup.sh -n -d
 						'''
 					}
 				}
