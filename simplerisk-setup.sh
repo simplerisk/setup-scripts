@@ -92,9 +92,8 @@ setup_ubuntu_1804(){
 	exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
 	print_status "Setting the maximum file upload size in PHP to 5MB..."
-	if [ "$VER" = "20.04" ]
-	then
-	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.4/apache2/php.ini"
+	if [ "$VER" = "20.04" ]; then
+		exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.4/apache2/php.ini"
 	else
 		exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini"
 	fi
@@ -134,15 +133,13 @@ setup_ubuntu_1804(){
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
 ###
-	if [ "$VER" = "20.04" ]
-	then
+	if [ "$VER" = "20.04" ]; then
 		exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
-       		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost'\""
-		exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
-else
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
-	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
+		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost'\""
+	else
+		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	fi
+	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
 	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
 	print_status "Setting the SimpleRisk database password..."
@@ -222,9 +219,9 @@ setup_centos_7(){
 	echo "  RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "</VirtualHost>" >> /etc/httpd/sites-enabled/simplerisk.conf
 
-	    if [ ! `grep -q "AllowOverride all" /etc/httpd/conf.d/ssl.conf` ]; then
-        exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
-    fi
+	if [ ! `grep -q "AllowOverride all" /etc/httpd/conf.d/ssl.conf` ]; then
+		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
+	fi
 	exec_cmd "sed -i '/<VirtualHost _default_:443>/a \\\t\tDocumentRoot "/var/www/simplerisk"' /etc/httpd/conf.d/ssl.conf"
 	
 	print_status "Installing the MariaDB database server..."
@@ -248,13 +245,13 @@ setup_centos_7(){
 	#exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\""
+	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
 	exec_cmd "mysql -uroot mysql -e \"DROP DATABASE test\""
 	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'localhost'\""
 	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'$(hostname)'\""
-	exec_cmd "mysql -uroot mysql -e \"UPDATE mysql.user SET Password = PASSWORD('${NEW_MYSQL_ROOT_PASSWORD}') WHERE User = 'root'\""
-	,exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
-	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
+	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
@@ -382,8 +379,8 @@ setup_rhel_8(){
 	exec_cmd "rm /etc/httpd/conf.d/welcome.conf"
 	
 	if [ ! `grep -q "AllowOverride all" /etc/httpd/conf.d/ssl.conf` ]; then
-    exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
-    fi
+		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
+	fi
 	print_status "Enabling and starting the MariaDB database server..."
 	exec_cmd "systemctl enable mariadb"
 	exec_cmd "systemctl start mariadb"
@@ -399,10 +396,10 @@ setup_rhel_8(){
 	#exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP ALTER ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
-	exec_cmd "mysql -uroot mysql -e \"UPDATE mysql.user SET Password = PASSWORD('${NEW_MYSQL_ROOT_PASSWORD}') WHERE User = 'root'\""
-	#exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\""
 	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
+	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
