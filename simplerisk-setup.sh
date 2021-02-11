@@ -144,6 +144,8 @@ setup_ubuntu_1804(){
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
 
 	print_status "Restarting MySQL to load the new configuration..."
 	exec_cmd "service mysql restart"
@@ -571,8 +573,8 @@ setup_suse_12(){
 	exec_cmd "systemctl restart apache2"
 
 	print_status "Generating MySQL passwords..."
-	NEW_MYSQL_ROOT_PASSWORD=`openssl rand -base64 20`
-	MYSQL_SIMPLERISK_PASSWORD=`openssl rand -base64 20`
+	NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
+	MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
 	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
 	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
 	chmod 600 /root/passwords.txt
@@ -589,6 +591,9 @@ setup_suse_12(){
 	
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	
+	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+
 
 	print_status "Restarting MySQL to load the new configuration..."
 	exec_cmd "systemctl restart mysql"
