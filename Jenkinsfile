@@ -1,7 +1,7 @@
 pipeline {
 	agent none
 	stages {
-		stage('Deployment Testing Through Local Script') {
+		stage('Deployment Testing - Local') {
 			parallel {
 				stage('Ubuntu 18.04') {
 					agent {
@@ -36,6 +36,16 @@ pipeline {
 				stage('CentOS 7') {
 					agent {
 						label 'centos7'
+					}
+					steps {
+						sh '''
+							sudo ./simplerisk-setup.sh -n -d
+						'''
+					}
+				}
+				stage('SLES 12') {
+					agent {
+						label 'sles12'
 					}
 					steps {
 						sh '''
