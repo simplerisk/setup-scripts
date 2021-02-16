@@ -227,9 +227,7 @@ setup_centos_7(){
 	exec_cmd "sed -i '/<VirtualHost _default_:443>/a \\\t\tDocumentRoot "/var/www/simplerisk"' /etc/httpd/conf.d/ssl.conf"
 	
 	print_status "Installing the MariaDB database server..."
-	exec_cmd "wget https://downloads.mariadb.com/MariaDB/mariadb_repo_setup"
-	exec_cmd "chmod +x mariadb_repo_setup"
-	exec_cmd "./mariadb_repo_setup && rm -rf mariadb_repo_setup"
+	exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
 	exec_cmd "yum -y install MariaDB-server"
 
 	print_status "Enabling and starting the MariaDB database server..."
@@ -338,9 +336,7 @@ setup_rhel_8(){
 	exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap php-curl"
 	
 	print_status "Installing the MariaDB database server..."
-	exec_cmd "wget https://downloads.mariadb.com/MariaDB/mariadb_repo_setup"
-	exec_cmd "chmod +x mariadb_repo_setup"
-	exec_cmd "./mariadb_repo_setup && rm -rf mariadb_repo_setup"
+	exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
 	exec_cmd "yum -y install perl-DBI libaio libsepol lsof boost-program-options"
 	exec_cmd "yum -y install --repo=\"mariadb-main\" MariaDB-server"
 	
