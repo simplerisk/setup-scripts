@@ -132,7 +132,7 @@ setup_ubuntu_1804(){
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
-###
+
 	if [ "$VER" = "20.04" ]; then
 		exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost'\""
@@ -205,19 +205,21 @@ setup_centos_7(){
 	exec_cmd "cd /etc/httpd && mkdir sites-available"
 	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
 	echo "IncludeOptional sites-enabled/*.conf" >> /etc/httpd/conf/httpd.conf
-	echo "<VirtualHost *:80>" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  ErrorLog /var/log/httpd/error_log" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  CustomLog /var/log/httpd/access_log combined" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  <Directory \"/var/www/simplerisk/\">" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "    AllowOverride all" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "    allow from all" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "    Options -Indexes" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  </Directory>" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  RewriteEngine On" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  RewriteCond %{HTTPS} !=on" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "</VirtualHost>" >> /etc/httpd/sites-enabled/simplerisk.conf
+	cat << EOF > /etc/httpd/sites-enabled/simplerisk.conf
+<VirtualHost *:80>
+	DocumentRoot "/var/www/simplerisk/"
+	ErrorLog /var/log/httpd/error_log
+	CustomLog /var/log/httpd/access_log combined
+	<Directory "/var/www/simplerisk/"> 
+		AllowOverride all
+		allow from all
+		Options -Indexes
+	</Directory>
+	RewriteEngine On
+	RewriteCond %{HTTPS} !=on
+	RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+</VirtualHost>
+EOF
 
 	if [ ! `grep -q "AllowOverride all" /etc/httpd/conf.d/ssl.conf` ]; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
@@ -240,7 +242,6 @@ setup_centos_7(){
 	chmod 600 /root/passwords.txt
 
 	print_status "Configuring MySQL..."
-	#exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
 	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
@@ -253,6 +254,10 @@ setup_centos_7(){
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	cat << EOF >> /etc/my.cnf
+[mysqld]
+sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+EOF
 
 	print_status "Restarting MySQL to load the new configuration..."
 	exec_cmd "systemctl restart mariadb"
@@ -358,20 +363,22 @@ setup_rhel_8(){
 	exec_cmd "sed -i 's/#DocumentRoot \"\/var\/www\/html\"/DocumentRoot \"\/var\/www\/simplerisk\"/' /etc/httpd/conf.d/ssl.conf"
 	exec_cmd "cd /etc/httpd && mkdir sites-available"
 	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
-	echo \"IncludeOptional sites-enabled/*.conf\" >> /etc/httpd/conf/httpd.conf
-	echo "<VirtualHost *:80>" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  ErrorLog /var/log/httpd/error_log" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  CustomLog /var/log/httpd/access_log combined" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  <Directory \"/var/www/simplerisk/\">" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "    AllowOverride all" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "    allow from all" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "    Options -Indexes" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  </Directory>" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  RewriteEngine On" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  RewriteCond %{HTTPS} !=on" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "  RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]" >> /etc/httpd/sites-enabled/simplerisk.conf
-	echo "</VirtualHost>" >> /etc/httpd/sites-enabled/simplerisk.conf
+	echo "IncludeOptional sites-enabled/*.conf" >> /etc/httpd/conf/httpd.conf
+cat << EOF > /etc/httpd/sites-enabled/simplerisk.conf
+<VirtualHost *:80>
+	DocumentRoot "/var/www/simplerisk/"
+	ErrorLog /var/log/httpd/error_log
+	CustomLog /var/log/httpd/access_log combined
+	<Directory "/var/www/simplerisk/">
+		AllowOverride all
+		allow from all
+		Options -Indexes
+	</Directory>
+	RewriteEngine On
+	RewriteCond %{HTTPS} !=on
+	RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+</VirtualHost>
+EOF
 	exec_cmd "rm /etc/httpd/conf.d/welcome.conf"
 	
 	if [ ! `grep -q "AllowOverride all" /etc/httpd/conf.d/ssl.conf` ]; then
@@ -399,6 +406,10 @@ setup_rhel_8(){
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	cat << EOF >> /etc/my.cnf
+[mysqld]
+sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+EOF
 
 	print_status "Restarting MySQL to load the new configuration..."
 	exec_cmd "systemctl restart mariadb"
@@ -547,8 +558,8 @@ setup_suse_12(){
 	print_status "Configuring secure settings for Apache..."
 	sed -i 's/\(SSLProtocol\).*/\1 TLSv1.2/g' /etc/apache2/ssl-global.conf                                  
 	sed -i 's/#\(SSLHonorCipherOrder\)/\1/g' /etc/apache2/ssl-global.conf 
-//	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
-//	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
+	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
+	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
 	print_status "Setting the maximum file upload size in PHP to 5MB..."
 	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php7/apache2/php.ini"
