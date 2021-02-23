@@ -179,8 +179,8 @@ setup_centos_7(){
 	print_status "Installing PHP for Apache..."
 	exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 	exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
-	exec_cmd "yum -y --enablerepo=remi,remi-php71 install httpd php php-common"
-	exec_cmd "yum -y --enablerepo=remi,remi-php71 install php-cli php-pear php-pdo php-mysqlnd php-gd php-mbstring php-mcrypt php-xml php-curl"
+	exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
+	exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-mbstring php-mcrypt php-xml php-curl php-ldap"
 
 	print_status "Installing mod_ssl"
 	exec_cmd "yum -y install mod_ssl"
