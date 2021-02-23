@@ -204,7 +204,7 @@ setup_centos_7(){
 	print_status "Configuring Apache..."
 	exec_cmd "cd /etc/httpd && mkdir sites-available"
 	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
-	exec_cmd "echo \"IncludeOptional sites-enabled/*.conf\" >> /etc/httpd/conf/httpd.conf"
+	echo "IncludeOptional sites-enabled/*.conf" >> /etc/httpd/conf/httpd.conf
 	echo "<VirtualHost *:80>" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "  ErrorLog /var/log/httpd/error_log" >> /etc/httpd/sites-enabled/simplerisk.conf
@@ -358,7 +358,7 @@ setup_rhel_8(){
 	exec_cmd "sed -i 's/#DocumentRoot \"\/var\/www\/html\"/DocumentRoot \"\/var\/www\/simplerisk\"/' /etc/httpd/conf.d/ssl.conf"
 	exec_cmd "cd /etc/httpd && mkdir sites-available"
 	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
-	exec_cmd "echo \"IncludeOptional sites-enabled/*.conf\" >> /etc/httpd/conf/httpd.conf"
+	echo \"IncludeOptional sites-enabled/*.conf\" >> /etc/httpd/conf/httpd.conf
 	echo "<VirtualHost *:80>" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/httpd/sites-enabled/simplerisk.conf
 	echo "  ErrorLog /var/log/httpd/error_log" >> /etc/httpd/sites-enabled/simplerisk.conf
