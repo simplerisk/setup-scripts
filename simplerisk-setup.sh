@@ -180,7 +180,7 @@ setup_centos_7(){
 	exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 	exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
 	exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-	exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-mbstring php-mcrypt php-xml php-curl php-ldap"
+	exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-mbstring php-xml php-curl php-ldap"
 
 	print_status "Installing mod_ssl"
 	exec_cmd "yum -y install mod_ssl"
@@ -336,7 +336,7 @@ setup_rhel_8(){
 	exec_cmd "yum -y install httpd"
 
 	print_status "Installing PHP for Apache..."
-	exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap php-curl"
+	exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap php-curl php-xml"
 	
 	print_status "Installing the MariaDB database server..."
 	exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
