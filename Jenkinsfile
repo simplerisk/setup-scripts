@@ -1,16 +1,21 @@
 pipeline {
 	agent none
 	stages {
-		stage('Setup Script Deployment') {
+		stage("Setup Script Deployment") {
 			parallel {
-				stage('Ubuntu 18.04') {
+				stage("Ubuntu 18.04") {
 					stages {
-						stage('Script On Server') {
+						stage("Script On Server") {
 							agent {
-								label 'ubuntu18'
+								label "ubuntu18"
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/ubuntu18", message: "Installing SimpleRisk through script on server...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu18", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
+									}
+								}
+								ubuntuReconfiguredpkg()
 								callScriptOnServer()
 								script {
 									u18_instance_id = getInstanceId() 
@@ -18,40 +23,70 @@ pipeline {
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/ubuntu18", message: "Couldn't install SimpleRisk through script on server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu18", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
-						stage('Cooldown') {
+						stage("Discard Server") {
 							agent {
-								label 'jenkins'
+								label "jenkins"
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/ubuntu18", message: "Destroying server...", state: "PENDING"
 								terminateInstance("${u18_instance_id}", "us-east-1")
-								sleep time: 30, unit: "SECONDS"
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/ubuntu18", message: "Couldn't destroy server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu18", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
-						stage('Through Web URL') {
+						stage("Through Web URL") {
 							agent {
-								label 'ubuntu18'
+								label "ubuntu18"
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/ubuntu18", message: "Installing SimpleRisk through URL...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu18", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
+									}
+								}
+								ubuntuReconfiguredpkg()
 								callScriptFromURL()
+								script {
+									u18_instance_id = getInstanceId() 
+								}
 							}
 							post {
 								success {
-									setGitHubPullRequestStatus context: "setup-scripts/ubuntu18", message: "SimpleRisk installed successfully.", state: "SUCCESS"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "success", context: "setup-scripts/ubuntu18", description: "SimpleRisk installed successfully.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/ubuntu18", message: "Couldn't install SimpleRisk through URL.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu18", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
+							}
+						}
+						stage("Discard Server (2)") {
+							agent {
+								label "jenkins"
+							}
+							steps {
+								terminateInstance("${u18_instance_id}", "us-east-1", 5)
 							}
 						}
 					}
@@ -63,7 +98,12 @@ pipeline {
 								label 'ubuntu20'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/ubuntu20", message: "Installing SimpleRisk through script on server...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu20", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
+									}
+								}
+								ubuntuReconfiguredpkg()
 								callScriptOnServer()
 								script {
 									u20_instance_id = getInstanceId() 
@@ -71,22 +111,28 @@ pipeline {
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/ubuntu20", message: "Couldn't install SimpleRisk through script on server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu20", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
-						stage('Cooldown') {
+						stage('Discard Server') {
 							agent {
 								label 'jenkins'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/ubuntu20", message: "Destroying server...", state: "PENDING"
 								terminateInstance("${u20_instance_id}", "us-east-1")
-								sleep time: 30, unit: "SECONDS"
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/ubuntu20", message: "Couldn't destroy server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu20", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
@@ -95,16 +141,37 @@ pipeline {
 								label 'ubuntu20'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/ubuntu20", message: "Installing SimpleRisk through URL...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu20", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
+									}
+								}
+								ubuntuReconfiguredpkg()
 								callScriptFromURL()
 							}
 							post {
 								success {
-									setGitHubPullRequestStatus context: "setup-scripts/ubuntu20", message: "SimpleRisk installed successfully.", state: "SUCCESS"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "success", context: "setup-scripts/ubuntu20", description: "SimpleRisk installed successfully.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/ubuntu20", message: "Couldn't install SimpleRisk through URL.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu20", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
+							}
+						}
+						stage("Discard Server (2)") {
+							agent {
+								label "jenkins"
+							}
+							steps {
+								terminateInstance("${u20_instance_id}", "us-east-1", 5)
 							}
 						}
 					}
@@ -116,7 +183,11 @@ pipeline {
 								label 'sles12'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/sles12", message: "Installing SimpleRisk through script on server...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/sles12", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
+									}
+								}
 								callScriptOnServer()
 								script {
 									sles_instance_id = getInstanceId() 
@@ -124,22 +195,28 @@ pipeline {
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/sles12", message: "Couldn't install SimpleRisk through script on server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles12", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
-						stage('Cooldown') {
+						stage('Discard Server') {
 							agent {
 								label 'jenkins'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/sles12", message: "Destroying server...", state: "PENDING"
 								terminateInstance("${sles_instance_id}", "us-east-1")
-								sleep time: 30, unit: "SECONDS"
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/sles12", message: "Couldn't destroy server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles12", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
@@ -148,16 +225,39 @@ pipeline {
 								label 'sles12'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/sles12", message: "Installing SimpleRisk through URL...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/sles12", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
+									}
+								}
 								callScriptFromURL()
+								script {
+									sles_instance_id = getInstanceId() 
+								}
 							}
 							post {
 								success {
-									setGitHubPullRequestStatus context: "setup-scripts/sles12", message: "SimpleRisk installed successfully.", state: "SUCCESS"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "success", context: "setup-scripts/sles12", description: "SimpleRisk installed successfully.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/sles12", message: "Couldn't install SimpleRisk through URL.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles12", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
+							}
+						}
+						stage("Discard Server (2)") {
+							agent {
+								label "jenkins"
+							}
+							steps {
+								terminateInstance("${sles_instance_id}", "us-east-1", 5)
 							}
 						}
 					}
@@ -169,7 +269,11 @@ pipeline {
 								label 'rhel8'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/rhel8", message: "Installing SimpleRisk through script on server...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/rhel8", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
+									}
+								}
 								callScriptOnServer()
 								script {
 									rhel_instance_id = getInstanceId()
@@ -177,22 +281,28 @@ pipeline {
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/rhel8", message: "Couldn't install SimpleRisk through script on server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/rhel8", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
-						stage('Cooldown') {
+						stage('Discard Server') {
 							agent {
 								label 'jenkins'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/rhel8", message: "Destroying server...", state: "PENDING"
 								terminateInstance("${rhel_instance_id}", "us-east-1")
-								sleep time: 30, unit: "SECONDS"
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/rhel8", message: "Couldn't destroy server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/rhel8", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
@@ -201,16 +311,39 @@ pipeline {
 								label 'rhel8'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/rhel8", message: "Installing SimpleRisk through URL...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/rhel8", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
+									}
+								}
 								callScriptFromURL()
+								script {
+									rhel_instance_id = getInstanceId()
+								}
 							}
 							post {
 								success {
-									setGitHubPullRequestStatus context: "setup-scripts/rhel8", message: "SimpleRisk installed successfully.", state: "SUCCESS"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "success", context: "setup-scripts/rhel8", description: "SimpleRisk installed successfully.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/rhel8", message: "Couldn't install SimpleRisk through URL.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/rhel8", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
+							}
+						}
+						stage("Discard Server (2)") {
+							agent {
+								label "jenkins"
+							}
+							steps {
+								terminateInstance("${rhel_instance_id}", "us-east-1", 5)
 							}
 						}
 					}
@@ -222,7 +355,11 @@ pipeline {
 								label 'centos7'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/centos7", message: "Installing SimpleRisk through script on server...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/centos7", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
+									}
+								}
 								callScriptOnServer()
 								script {
 									centos_instance_id = getInstanceId()
@@ -230,22 +367,28 @@ pipeline {
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/centos7", message: "Couldn't install SimpleRisk through script on server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/centos7", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
-						stage('Cooldown') {
+						stage('Discard Server') {
 							agent {
 								label 'jenkins'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/centos7", message: "Destroying server...", state: "PENDING"
 								terminateInstance("${centos_instance_id}", "us-east-1")
-								sleep time: 30, unit: "SECONDS"
 							}
 							post {
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/centos7", message: "Couldn't destroy server.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/centos7", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 							}
 						}
@@ -254,16 +397,39 @@ pipeline {
 								label 'centos7'
 							}
 							steps {
-								setGitHubPullRequestStatus context: "setup-scripts/centos7", message: "Installing SimpleRisk through URL...", state: "PENDING"
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/centos7", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
+									}
+								}
 								callScriptFromURL()
+								script {
+									centos_instance_id = getInstanceId()
+								}
 							}
 							post {
 								success {
-									setGitHubPullRequestStatus context: "setup-scripts/centos7", message: "SimpleRisk installed successfully.", state: "SUCCESS"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "success", context: "setup-scripts/centos7", description: "SimpleRisk installed successfully.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
 								failure {
-									setGitHubPullRequestStatus context: "setup-scripts/centos7", message: "Couldn't install SimpleRisk through URL.", state: "FAILURE"
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/centos7", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+										}
+									}
 								}
+							}
+						}
+						stage("Discard Server (2)") {
+							agent {
+								label "jenkins"
+							}
+							steps {
+								terminateInstance("${centos_instance_id}", "us-east-1", 5)
 							}
 						}
 					}
@@ -274,23 +440,34 @@ pipeline {
 }
 
 void callScriptOnServer() {
-	sh '''
-		sudo ./simplerisk-setup.sh -n
-		[ "$(curl -s -o /dev/null -w '%{http_code}' -k https://localhost)" = "200" ] && exit 0 || exit 1
-	'''
+	sh "sudo ./simplerisk-setup.sh -n -d"
+	validateStatusCode()
 }
 
 def getInstanceId() {
 	return sh(script: 'echo $(TOKEN=`curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` && curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)', returnStdout: true).trim()
 }
 
-void terminateInstance(String instanceId, String region) {
+void terminateInstance(String instanceId, String region, Integer number=60) {
 	sh "aws ec2 terminate-instances --instance-ids $instanceId --region $region"
+	sh "sleep $number"
 }
 
 void callScriptFromURL() {
+	sh "curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/${(env.CHANGE_ID != null ? pullRequest.head : env.BRANCH_NAME)}/simplerisk-setup.sh | sudo bash -s -- -n -d"
+	validateStatusCode()
+}
+
+void validateStatusCode(String urlToCheck="https://localhost") {
+	sh "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -k $urlToCheck)\" = \"200\" ] && exit 0 || exit 1"
+}
+
+void ubuntuReconfiguredpkg() {
 	sh '''
-		curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/${GITHUB_PR_HEAD_SHA}/simplerisk-setup.sh | sudo bash -s -- -n
-		[ "$(curl -s -o /dev/null -w '%{http_code}' -k https://localhost)" = "200" ] && exit 0 || exit 1
+		sudo rm -f /var/lib/dpkg/lock
+		sudo rm -f /var/lib/dpkg/lock-frontend
+		sudo rm -f /var/apt/lists/lock
+		sudo rm -f /var/cache/apt/archives/lock
+		sudo dpkg --configure -a
 	'''
 }
