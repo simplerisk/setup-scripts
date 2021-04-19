@@ -50,6 +50,19 @@ generate_passwords() {
 	chmod 600 /root/passwords.txt
 }
 
+set_up_simplerisk() {
+	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
+	[ ! -d /var/www ] && exec_cmd "mkdir -P /var/www/"
+	[ -d /var/www/html ] && exec_cmd "rm -r /var/www/html"
+	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
+	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
+	exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
+	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
+	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
+	exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
+	exec_cmd "chown -R www-data: /var/www/simplerisk"
+}
+
 setup_ubuntu(){
 	# Get the current SimpleRisk release version
 	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
@@ -106,15 +119,8 @@ setup_ubuntu(){
 	else
 		exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini"
 	fi
-	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
-	exec_cmd "rm -r /var/www/html"
-	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "chown -R www-data: /var/www/simplerisk"
+
+	set_up_simplerisk
 
 	print_status "Configuring Apache..."
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
@@ -195,14 +201,7 @@ setup_centos_7(){
 	print_status "Installing Firewalld"
 	exec_cmd "yum -y install firewalld"
 
-	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
-	exec_cmd "cd /var/www/ && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/ && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "chown -R apache: /var/www/simplerisk"
+	set_up_simplerisk
 
 	print_status "Configuring Apache..."
 	exec_cmd "cd /etc/httpd && mkdir sites-available"
@@ -348,14 +347,7 @@ setup_rhel_8(){
 	exec_cmd "systemctl enable httpd"
 	exec_cmd "systemctl start httpd"
 
-	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
-	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "chown -R apache: /var/www/simplerisk"
+	set_up_simplerisk
 
 	print_status "Configuring Apache..."
 	exec_cmd "sed -i 's/#DocumentRoot \"\/var\/www\/html\"/DocumentRoot \"\/var\/www\/simplerisk\"/' /etc/httpd/conf.d/ssl.conf"
@@ -557,15 +549,7 @@ EOF
 	print_status "Setting the maximum file upload size in PHP to 5MB..."
 	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php7/apache2/php.ini"
 
-	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
-	exec_cmd "mkdir /var/www/"
-	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "chown -R wwwrun: /var/www/simplerisk"
+	set_up_simplerisk
 
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "systemctl restart apache2"
