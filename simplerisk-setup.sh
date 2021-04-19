@@ -41,7 +41,7 @@ check_root() {
 	fi
 }
 
-setup_ubuntu_1804(){
+setup_ubuntu(){
 	# Get the current SimpleRisk release version
 	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
 
@@ -471,7 +471,7 @@ EOF
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
-setup_suse_12(){
+setup_suse(){
 	# Get the current SimpleRisk release version
 	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
 
@@ -536,7 +536,7 @@ EOF
 	exec_cmd "rm /etc/apache2/ssl.key/simplerisk.pass.key"
 
 	# Generate the CSR
-	exec_cmd "openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out  /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk""
+	exec_cmd "openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out  /etc/apache2/ssl.csr/simplerisk.csr -subj \"/CN=simplerisk\""
 
 	# Create the Certificate
 	exec_cmd "openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt"
@@ -588,6 +588,9 @@ EOF
 	chmod 600 /root/passwords.txt
 
 	print_status "Configuring MySQL..."
+	if [[ $VER = 15* ]]; then
+		exec_cmd "sed -i 's/\(\[mysqld\]\)/\1\nsql_mode=NO_ENGINE_SUBSTITUTION/g' /etc/my.cnf"
+	fi
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
 	exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
@@ -627,7 +630,7 @@ validate_os(){
 	case "$1" in
 		"Ubuntu")
 			if [ "$2" = "18.04" ] || [ "$2" = "20.04" ]; then
-				detected_os_proceed "$1" "$2" && setup_ubuntu_1804 && exit 0
+				detected_os_proceed "$1" "$2" && setup_ubuntu && exit 0
 			else
 				detected_os_but_unsupported_version "$1" "$2"
 			fi;;
@@ -638,8 +641,8 @@ validate_os(){
 				detected_os_but_unsupported_version "$1" "$2"
 			fi;;
 		"SLES")
-			if [ "$2" = "12.5" ] || [ "$2" = "12.4" ] || [ "$2" = "12.3" ] || [ "$2" = "12.2" ] || [ "$2" = "12.1" ]; then
-				detected_os_proceed "$1" "$2" && setup_suse_12 && exit 0
+			if [[ "$2" = 15* ]] || [[ "$2" = 12* ]]; then
+				detected_os_proceed "$1" "$2" && setup_suse && exit 0
 			else
 				detected_os_but_unsupported_version "$1" "$2"
 			fi;;
