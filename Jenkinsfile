@@ -16,7 +16,6 @@ pipeline {
 									}
 									u18_instance_id = getInstanceId()
 								}
-								ubuntuReconfiguredpkg()
 								callScriptOnServer()
 							}
 							post {
@@ -45,7 +44,6 @@ pipeline {
 									}
 									u18_instance_id = getInstanceId()
 								}
-								ubuntuReconfiguredpkg()
 								callScriptFromURL()
 							}
 							post {
