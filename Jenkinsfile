@@ -83,7 +83,6 @@ pipeline {
 									}
 									u20_instance_id = getInstanceId()
 								}
-								ubuntuReconfiguredpkg()
 								callScriptOnServer()
 							}
 							post {
@@ -112,7 +111,6 @@ pipeline {
 									}
 									u20_instance_id = getInstanceId()
 								}
-								ubuntuReconfiguredpkg()
 								callScriptFromURL()
 							}
 							post {
