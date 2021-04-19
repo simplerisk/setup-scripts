@@ -482,21 +482,21 @@ setup_suse_12(){
 
 	print_status "Installing Apache..."
 	exec_cmd "zypper --non-interactive install apache2"
-	
-	print_status "Starting Apache..."
-	exec_cmd "systemctl start apache2"
-	
+
 	print_status "Enabling Apache on reboot..."
 	exec_cmd "systemctl enable apache2"
+
+	print_status "Starting Apache..."
+	exec_cmd "systemctl start apache2"
 
 	print_status "Installing MariaDB..."
 	exec_cmd "zypper --non-interactive install mariadb mariadb-client mariadb-tools"
 
-	print_status "Starting MySQL..."
-	exec_cmd "systemctl start mysql"
-
 	print_status "Enabling MySQL on reboot..."
 	exec_cmd "systemctl enable mysql"
+
+	print_status "Starting MySQL..."
+	exec_cmd "systemctl start mysql"
 
 	print_status "Installing PHP 7..."
 	exec_cmd "zypper --non-interactive install php7 php7-mysql apache2-mod_php7 php-ldap php-curl php-zlib php-phar php-mbstring"
