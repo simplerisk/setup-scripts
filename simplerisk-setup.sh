@@ -13,12 +13,12 @@ export DEBIAN_FRONTEND=noninteractive
 
 print_status() {
 	echo
-	echo "## $1"
+	echo "## ${1}"
 	echo
 }
 
 exec_cmd(){
-	exec_cmd_nobail "$1" || bail
+	exec_cmd_nobail "${1}" || bail
 }
 
 bail() {
@@ -28,17 +28,26 @@ bail() {
 
 exec_cmd_nobail() {
 	[ -v DEBUG ] || NO_LOG="> /dev/null 2>&1"
-	echo "+ $1 ${NO_LOG:-}"
-	bash -c "$1 ${NO_LOG:-}"
+	echo "+ ${1} ${NO_LOG:-}"
+	bash -c "${1} ${NO_LOG:-}"
 }
 
 check_root() {
 	## Check to make sure we are running as root
-	if [[ $EUID -ne 0 ]]; then
+	if [[ ${EUID} -ne 0 ]]; then
 		print_status "ERROR: This script must be run as root!"
 		print_status "Try running the command 'sudo bash' and then run this script again..."
 		exit 1
 	fi
+}
+
+generate_passwords() {
+	print_status "Generating MySQL passwords..."
+	NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
+	MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
+	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
+	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
+	chmod 600 /root/passwords.txt
 }
 
 setup_ubuntu(){
@@ -92,7 +101,7 @@ setup_ubuntu(){
 	exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
 	print_status "Setting the maximum file upload size in PHP to 5MB..."
-	if [ "$VER" = "20.04" ]; then
+	if [ "${VER}" = "20.04" ]; then
 		exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.4/apache2/php.ini"
 	else
 		exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini"
@@ -120,20 +129,14 @@ setup_ubuntu(){
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "service apache2 restart"
 
-	print_status "Generating MySQL passwords..."
-	exec_cmd "apt-get install -y pwgen"
-	NEW_MYSQL_ROOT_PASSWORD=`pwgen -c -n -1 20`
-	MYSQL_SIMPLERISK_PASSWORD=`pwgen -c -n -1 20`
-	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
-	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
-	chmod 600 /root/passwords.txt
+	generate_passwords
 
 	print_status "Configuring MySQL..."
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
 
-	if [ "$VER" = "20.04" ]; then
+	if [ "${VER}" = "20.04" ]; then
 		exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost'\""
 	else
@@ -234,12 +237,7 @@ EOF
 	exec_cmd "systemctl enable mariadb"
 	exec_cmd "systemctl start mariadb"
 
-	print_status "Generating MySQL passwords..."
-	NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
-	MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
-	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
-	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
-	chmod 600 /root/passwords.txt
+	generate_passwords
 
 	print_status "Configuring MySQL..."
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
@@ -388,12 +386,7 @@ EOF
 	exec_cmd "systemctl enable mariadb"
 	exec_cmd "systemctl start mariadb"
 
-	print_status "Generating MySQL passwords..."
-	NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
-	MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
-	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
-	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
-	chmod 600 /root/passwords.txt
+	generate_passwords
 
 	print_status "Configuring MySQL..."
 	#exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
@@ -464,9 +457,6 @@ EOF
 	exec_cmd "setsebool -P httpd_verify_dns=0"
 	exec_cmd "chcon -R -t httpd_sys_rw_content_t /var/www/simplerisk" 
 
-	
-	
-		
 	print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
@@ -580,15 +570,10 @@ EOF
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "systemctl restart apache2"
 
-	print_status "Generating MySQL passwords..."
-	NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
-	MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
-	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
-	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
-	chmod 600 /root/passwords.txt
+	generate_passwords
 
 	print_status "Configuring MySQL..."
-	if [[ $VER = 15* ]]; then
+	if [[ "${VER}" = 15* ]]; then
 		exec_cmd "sed -i 's/\(\[mysqld\]\)/\1\nsql_mode=NO_ENGINE_SUBSTITUTION/g' /etc/my.cnf"
 	fi
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
@@ -612,45 +597,39 @@ EOF
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
-# $1 = OS
-# $2 = Version
 detected_os_proceed(){
-	echo "Detected that we are running ${1} ${2}. Continuing with SimpleRisk setup." 
+	echo "Detected that we are running ${OS} ${VER}. Continuing with SimpleRisk setup." 
 }
 
-# $1 = OS
-# $2 = Version
 detected_os_but_unsupported_version(){
-	echo "Detected that we are running ${1} ${2}, but this version is not currently supported." && exit 1
+	echo "Detected that we are running ${OS} ${VER}, but this version is not currently supported." && exit 1
 }
 
-# $1 = OS
-# $2 = Version
 validate_os(){
-	case "$1" in
+	case "$OS" in
 		"Ubuntu")
-			if [ "$2" = "18.04" ] || [ "$2" = "20.04" ]; then
-				detected_os_proceed "$1" "$2" && setup_ubuntu && exit 0
+			if [ "${VER}" = "18.04" ] || [ "${VER}" = "20.04" ]; then
+				detected_os_proceed && setup_ubuntu && exit 0
 			else
-				detected_os_but_unsupported_version "$1" "$2"
+				detected_os_but_unsupported_version
 			fi;;
 		"CentOS Linux")
-			if [ "$2" = "7" ]; then
-				detected_os_proceed "$1" "$2" && setup_centos_7 && exit 0
+			if [ "${VER}" = "7" ]; then
+				detected_os_proceed && setup_centos_7 && exit 0
 			else
-				detected_os_but_unsupported_version "$1" "$2"
+				detected_os_but_unsupported_version
 			fi;;
 		"SLES")
-			if [[ "$2" = 15* ]] || [[ "$2" = 12* ]]; then
-				detected_os_proceed "$1" "$2" && setup_suse && exit 0
+			if [[ "${VER}" = 15* ]] || [[ "${VER}" = 12* ]]; then
+				detected_os_proceed && setup_suse && exit 0
 			else
-				detected_os_but_unsupported_version "$1" "$2"
+				detected_os_but_unsupported_version
 			fi;;
 		"Red Hat Enterprise Linux")
-			if [ "$2" = "8.0" ] || [ "$2" = "8.1" ] || [ "$2" = "8.2" ] || [ "$2" = "8.3" ]; then
-				detected_os_proceed "$1" "$2" && setup_rhel_8 && exit 0
+			if [[ "${VER}" = 8* ]]; then
+				detected_os_proceed && setup_rhel_8 && exit 0
 			else
-				detected_os_but_unsupported_version "$1" "$2"
+				detected_os_but_unsupported_version
 			fi;;
 		*)
 			echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS. Exiting." && exit 1;;
@@ -690,12 +669,12 @@ os_detect(){
 		VER=$(uname -r)
 	fi
 
-	validate_os "${OS}" "${VER}"
+	validate_os
 }
 
 ask_user(){
 	read -p "This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
-	case $answer in
+	case "${answer}" in
 		Yes|yes|Y|y ) os_detect;;
 		* ) exit 1;;
 	esac
@@ -704,8 +683,8 @@ ask_user(){
 validate_args(){
 	while [[ $# -gt 0 ]]
 	do
-		key="$1"
-		case $key in
+		key="${1}"
+		case "${key}" in
 			-n|--no-assistance)
 				HEADLESS=y 
 				shift;;
@@ -713,12 +692,12 @@ validate_args(){
 				DEBUG=y
 				shift;;
 			*)    # unknown option
-				echo "Provided parameter $key is not valid. Stopping."
+				echo "Provided parameter ${key} is not valid. Stopping."
 				exit 1;;
 		esac
 	done
 
-	if [ -n "$HEADLESS" ]; then
+	if [ -n "${HEADLESS}" ]; then
 		os_detect
 	else
 		ask_user
