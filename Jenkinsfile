@@ -405,14 +405,6 @@ pipeline {
 								}
 							}
 						}
-						stage("Discard Server (2)") {
-							agent {
-								label "jenkins"
-							}
-							steps {
-								terminateInstance("${centos_instance_id}", "us-east-1", 5)
-							}
-						}
 					}
 				}
 			}
