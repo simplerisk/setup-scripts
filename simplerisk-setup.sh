@@ -510,22 +510,23 @@ setup_suse_12(){
 	print_status "Enabling Rewrite Module for Apache..."
 	echo "LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so" >> /etc/apache2/loadmodule.conf
 
-	
 	print_status "Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert"
 	echo "Listen 443" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "<VirtualHost *:80>" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "  ErrorLog /var/log/apache2/error_log" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "  CustomLog /var/log/apache2/access_log combined" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "  <Directory \"/var/www/simplerisk/\">" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "    AllowOverride all" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "    Require all granted" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "    Options -Indexes" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "  </Directory>" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "  RewriteEngine On" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "  RewriteCond %{HTTPS} !=on" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "  RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]" >> /etc/apache2/vhosts.d/simplerisk.conf
-	echo "</VirtualHost>" >> /etc/apache2/vhosts.d/simplerisk.conf
+	cat << EOF >> /etc/apache2/vhosts.d/simplerisk.conf
+<VirtualHost *:80>
+	DocumentRoot "/var/www/simplerisk/"
+	ErrorLog /var/log/apache2/error_log
+	CustomLog /var/log/apache2/access_log combined
+	<Directory "/var/www/simplerisk/">
+		AllowOverride all
+		Require all granted
+		Options -Indexes
+	</Directory>
+	RewriteEngine On
+	RewriteCond %{HTTPS} !=on
+	RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+</VirtualHost>
+EOF
 	
 	# Generate the OpenSSL private key
 	exec_cmd "openssl genrsa -des3 -passout pass:/passwords/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key"
@@ -540,24 +541,26 @@ setup_suse_12(){
 	# Create the Certificate
 	exec_cmd "openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt"
 
-	echo "<VirtualHost *:443>" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "  DocumentRoot \"/var/www/simplerisk/\"" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "  ErrorLog /var/log/apache2/error_log" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "  CustomLog /var/log/apache2/access_log combined" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "  <Directory \"/var/www/simplerisk/\">" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "    AllowOverride all" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "    Require all granted" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "    Options -Indexes" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "  </Directory>" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "  SSLEngine on" >> /etc/apache2/vhosts.d/ssl.conf
-    echo "  SSLCertificateFile /etc/apache2/ssl.crt/simplerisk.crt" >> /etc/apache2/vhosts.d/ssl.conf
-    echo "  SSLCertificateKeyFile /etc/apache2/ssl.key/simplerisk.key" >> /etc/apache2/vhosts.d/ssl.conf
-    echo " #SSLCertificateChainFile /etc/apache2/ssl.crt/vhost-example-chain.crt" >> /etc/apache2/vhosts.d/ssl.conf
-	echo "</VirtualHost>" >> /etc/apache2/vhosts.d/ssl.conf
+	cat << EOF >> /etc/apache2/vhosts.d/ssl.conf
+<VirtualHost *:443>
+	DocumentRoot "/var/www/simplerisk/"
+	ErrorLog /var/log/apache2/error_log
+	CustomLog /var/log/apache2/access_log combined
+	<Directory "/var/www/simplerisk/">
+		AllowOverride all
+		Require all granted
+		Options -Indexes
+	</Directory>
+	SSLEngine on
+	SSLCertificateFile /etc/apache2/ssl.crt/simplerisk.crt
+	SSLCertificateKeyFile /etc/apache2/ssl.key/simplerisk.key
+	#SSLCertificateChainFile /etc/apache2/ssl.crt/vhost-example-chain.crt
+</VirtualHost>
+EOF
 
 	print_status "Configuring secure settings for Apache..."
-	sed -i 's/\(SSLProtocol\).*/\1 TLSv1.2/g' /etc/apache2/ssl-global.conf                                  
-	sed -i 's/#\(SSLHonorCipherOrder\)/\1/g' /etc/apache2/ssl-global.conf 
+	exec_cmd "sed -i 's/\(SSLProtocol\).*/\1 TLSv1.2/g' /etc/apache2/ssl-global.conf"
+	exec_cmd "sed -i 's/#\(SSLHonorCipherOrder\)/\1/g' /etc/apache2/ssl-global.conf"
 	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
 	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
@@ -589,9 +592,8 @@ setup_suse_12(){
 	exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
-	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'\""
+	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\""
-	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 	
 	print_status "Setting the SimpleRisk database password..."
