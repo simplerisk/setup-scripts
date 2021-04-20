@@ -513,6 +513,8 @@ setup_suse(){
 		AllowOverride all
 		Require all granted
 		Options -Indexes
+		Options FollowSymLinks
+		Options SymLinksIfOwnerMatch
 	</Directory>
 	RewriteEngine On
 	RewriteCond %{HTTPS} !=on
@@ -542,6 +544,8 @@ EOF
 		AllowOverride all
 		Require all granted
 		Options -Indexes
+		Options FollowSymLinks
+		Options SymLinksIfOwnerMatch
 	</Directory>
 	SSLEngine on
 	SSLCertificateFile /etc/apache2/ssl.crt/simplerisk.crt
