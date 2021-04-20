@@ -354,8 +354,8 @@ setup_rhel_8(){
 
 	print_status "Configuring Apache..."
 	exec_cmd "sed -i 's/#DocumentRoot \"\/var\/www\/html\"/DocumentRoot \"\/var\/www\/simplerisk\"/' /etc/httpd/conf.d/ssl.conf"
-	exec_cmd "cd /etc/httpd && mkdir sites-available"
-	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
+	exec_cmd "mkdir /etc/httpd/sites-{available,enabled}"
+	exec_cmd "sed -i 's/\(DocumentRoot \"\/var\/www\).*/\1\"/g' /etc/httpd/conf/httpd.conf"
 	echo "IncludeOptional sites-enabled/*.conf" >> /etc/httpd/conf/httpd.conf
 cat << EOF > /etc/httpd/sites-enabled/simplerisk.conf
 <VirtualHost *:80>
