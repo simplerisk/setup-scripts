@@ -52,8 +52,11 @@ generate_passwords() {
 
 set_up_simplerisk() {
 	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
-	[ ! -d /var/www ] && exec_cmd "mkdir -P /var/www/"
-	[ -d /var/www/html ] && exec_cmd "rm -r /var/www/html"
+	if [ ! -d /var/www ]; then
+		exec_cmd "mkdir -P /var/www/"
+	elif [ -d /var/www/html ]; then
+		exec_cmd "rm -r /var/www/html"
+	fi
 	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
 	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
 	exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
@@ -639,14 +642,10 @@ os_detect(){
 		# Older Debian/Ubuntu/etc.
 		OS=Debian
 		VER=$(cat /etc/debian_version)
-	elif [ -f /etc/SuSe-release ]; then
-		# Older SuSE/etc.
-                echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
-                exit 1
-	elif [ -f /etc/redhat-release ]; then
-		# Older Red Hat, CentOS, etc.
-                echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
-                exit 1
+	elif [ -f /etc/SuSe-release ] || [ -f /etc/redhat-release ]; then
+		# Older SuSE/etc. or Red Hat, CentOS, etc.
+        echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
+        exit 1
 	else
 		# Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
 		OS=$(uname -s)
