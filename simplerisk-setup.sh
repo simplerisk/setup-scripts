@@ -63,7 +63,7 @@ set_up_simplerisk() {
 	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
 	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
 	exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "chown -R www-data: /var/www/simplerisk"
+	exec_cmd "chown -R ${1}: /var/www/simplerisk"
 }
 
 setup_ubuntu(){
@@ -123,7 +123,7 @@ setup_ubuntu(){
 		exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini"
 	fi
 
-	set_up_simplerisk
+	set_up_simplerisk "www-data"
 
 	print_status "Configuring Apache..."
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
@@ -204,7 +204,7 @@ setup_centos_7(){
 	print_status "Installing Firewalld"
 	exec_cmd "yum -y install firewalld"
 
-	set_up_simplerisk
+	set_up_simplerisk "apache"
 
 	print_status "Configuring Apache..."
 	exec_cmd "cd /etc/httpd && mkdir sites-available"
@@ -350,7 +350,7 @@ setup_rhel_8(){
 	exec_cmd "systemctl enable httpd"
 	exec_cmd "systemctl start httpd"
 
-	set_up_simplerisk
+	set_up_simplerisk "apache"
 
 	print_status "Configuring Apache..."
 	exec_cmd "sed -i 's/#DocumentRoot \"\/var\/www\/html\"/DocumentRoot \"\/var\/www\/simplerisk\"/' /etc/httpd/conf.d/ssl.conf"
@@ -552,7 +552,7 @@ EOF
 	print_status "Setting the maximum file upload size in PHP to 5MB..."
 	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php7/apache2/php.ini"
 
-	set_up_simplerisk
+	set_up_simplerisk "wwwrun"
 
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "systemctl restart apache2"
