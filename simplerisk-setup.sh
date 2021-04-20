@@ -53,7 +53,7 @@ generate_passwords() {
 set_up_simplerisk() {
 	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
 	if [ ! -d /var/www ]; then
-		exec_cmd "mkdir -P /var/www/"
+		exec_cmd "mkdir -p /var/www/"
 	elif [ -d /var/www/html ]; then
 		exec_cmd "rm -r /var/www/html"
 	fi
