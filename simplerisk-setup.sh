@@ -53,7 +53,7 @@ generate_passwords() {
 set_up_simplerisk() {
 	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
 	if [ ! -d /var/www ]; then
-		exec_cmd "mkdir -P /var/www/"
+		exec_cmd "mkdir -p /var/www/"
 	elif [ -d /var/www/html ]; then
 		exec_cmd "rm -r /var/www/html"
 	fi
@@ -207,8 +207,8 @@ setup_centos_7(){
 	set_up_simplerisk "apache"
 
 	print_status "Configuring Apache..."
-	exec_cmd "cd /etc/httpd && mkdir sites-available"
-	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
+	exec_cmd "mkdir /etc/httpd/sites-{available,enabled}"
+	exec_cmd "sed -i 's/\(DocumentRoot \"\/var\/www\).*/\1\"/g' /etc/httpd/conf/httpd.conf"
 	echo "IncludeOptional sites-enabled/*.conf" >> /etc/httpd/conf/httpd.conf
 	cat << EOF > /etc/httpd/sites-enabled/simplerisk.conf
 <VirtualHost *:80>
@@ -354,8 +354,8 @@ setup_rhel_8(){
 
 	print_status "Configuring Apache..."
 	exec_cmd "sed -i 's/#DocumentRoot \"\/var\/www\/html\"/DocumentRoot \"\/var\/www\/simplerisk\"/' /etc/httpd/conf.d/ssl.conf"
-	exec_cmd "cd /etc/httpd && mkdir sites-available"
-	exec_cmd "cd /etc/httpd && mkdir sites-enabled"
+	exec_cmd "mkdir /etc/httpd/sites-{available,enabled}"
+	exec_cmd "sed -i 's/\(DocumentRoot \"\/var\/www\).*/\1\"/g' /etc/httpd/conf/httpd.conf"
 	echo "IncludeOptional sites-enabled/*.conf" >> /etc/httpd/conf/httpd.conf
 cat << EOF > /etc/httpd/sites-enabled/simplerisk.conf
 <VirtualHost *:80>
@@ -463,10 +463,17 @@ setup_suse(){
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
 	print_status "Populating zypper cache..."
-	exec_cmd 'zypper --non-interactive update'
+	exec_cmd 'zypper -n update'
+
+	if [[ "${VER}" = 12* ]]; then
+		print_status "Adding PHP 7.3 repository for SLES 12..."
+		SP_VER="${VER: -1}"
+		exec_cmd "zypper -n addrepo -f https://download.opensuse.org/repositories/devel:/languages:/php:/php73/SLE_12_SP${SP_VER}/devel:languages:php:php73.repo"
+		exec_cmd "zypper --gpg-auto-import-keys refresh"
+	fi
 
 	print_status "Installing Apache..."
-	exec_cmd "zypper --non-interactive install apache2"
+	exec_cmd "zypper -n install apache2"
 
 	print_status "Enabling Apache on reboot..."
 	exec_cmd "systemctl enable apache2"
@@ -475,7 +482,7 @@ setup_suse(){
 	exec_cmd "systemctl start apache2"
 
 	print_status "Installing MariaDB..."
-	exec_cmd "zypper --non-interactive install mariadb mariadb-client mariadb-tools"
+	exec_cmd "zypper -n install mariadb mariadb-client mariadb-tools"
 
 	print_status "Enabling MySQL on reboot..."
 	exec_cmd "systemctl enable mysql"
@@ -484,7 +491,7 @@ setup_suse(){
 	exec_cmd "systemctl start mysql"
 
 	print_status "Installing PHP 7..."
-	exec_cmd "zypper --non-interactive install php7 php7-mysql apache2-mod_php7 php-ldap php-curl php-zlib php-phar php-mbstring"
+	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring"
 	exec_cmd "a2enmod php7"
 
 	print_status "Enabling SSL for Apache..."
@@ -506,6 +513,8 @@ setup_suse(){
 		AllowOverride all
 		Require all granted
 		Options -Indexes
+		Options FollowSymLinks
+		Options SymLinksIfOwnerMatch
 	</Directory>
 	RewriteEngine On
 	RewriteCond %{HTTPS} !=on
@@ -535,6 +544,8 @@ EOF
 		AllowOverride all
 		Require all granted
 		Options -Indexes
+		Options FollowSymLinks
+		Options SymLinksIfOwnerMatch
 	</Directory>
 	SSLEngine on
 	SSLCertificateFile /etc/apache2/ssl.crt/simplerisk.crt
