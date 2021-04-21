@@ -150,6 +150,7 @@ pipeline {
 									}
 									sles12_instance_id = getInstanceId()
 								}
+								suseRegisterCloudGuest()
 								callScriptOnServer()
 							}
 							post {
@@ -178,6 +179,7 @@ pipeline {
 									}
 									sles12_instance_id = getInstanceId()
 								}
+								suseRegisterCloudGuest()
 								callScriptFromURL()
 							}
 							post {
@@ -431,6 +433,16 @@ void callScriptFromURL() {
 
 void validateStatusCode(String urlToCheck="https://localhost") {
 	sh "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -k $urlToCheck)\" = \"200\" ] && exit 0 || exit 1"
+}
+
+void suseRegisterCloudGuest() {
+	sh """
+		sudo rm /etc/SUSEConnect
+		sudo rm -f /etc/zypp/{repos,services,credentials}.d/*
+		sudo rm -f /usr/lib/zypp/plugins/services/*
+		sudo sed -i '/^# Added by SMT reg/,+1d' /etc/hosts
+		sudo /usr/sbin/registercloudguest --force-new
+	"""
 }
 
 void ubuntuReconfiguredpkg() {
