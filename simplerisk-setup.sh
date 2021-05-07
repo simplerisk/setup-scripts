@@ -41,6 +41,126 @@ check_root() {
 	fi
 }
 
+setup_debian_10(){
+        # Get the current SimpleRisk release version
+        CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+
+        print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+
+        print_status "Populating apt-get cache..."
+        exec_cmd 'apt-get update'
+
+        print_status "Waiting for the cache to be unlocked... (Needed for AWS)"
+        exec_cmd 'while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 1; done;'
+
+        print_status "Updating current packages (this may take a bit)..."
+        exec_cmd 'apt-get dist-upgrade -qq --assume-yes'
+
+	print_status "Installing Apache..."
+	exec_cmd "apt-get install -y apache2"
+
+	print_status "Installing MariaDB..."
+	exec_cmd "apt install -y mariadb-server"
+
+	print_status "Installing PHP..."
+	exec_cmd "apt-get install -y php php-mysql libapache2-mod-php"
+
+        print_status "Installing mbstring module for PHP..."
+        exec_cmd "apt-get install -y php-mbstring"
+
+        print_status "Installing PHP development libraries..."
+        exec_cmd "apt-get install -y php-dev"
+
+        print_status "Installing pear for PHP..."
+        exec_cmd "apt-get install -y php-pear"
+
+        print_status "Installing ldap module for PHP..."
+        exec_cmd "apt-get install -y php-ldap"
+
+        print_status "Enabling the ldap module in PHP..."
+        exec_cmd "phpenmod ldap"
+
+        print_status "Installing curl module for PHP..."
+        exec_cmd "apt-get install -y php-curl"
+
+        print_status "Enabling SSL for Apache..."
+        exec_cmd "a2enmod rewrite"
+        exec_cmd "a2enmod ssl"
+        exec_cmd "a2ensite default-ssl"
+
+        print_status "Configuring secure settings for Apache..."
+        exec_cmd "sed -i 's/SSLProtocol all -SSLv3/SSLProtocol TLSv1.2/g' /etc/apache2/mods-enabled/ssl.conf"
+        exec_cmd "sed -i 's/#SSLHonorCipherOrder on/SSLHonorCipherOrder on/g' /etc/apache2/mods-enabled/ssl.conf"
+        exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
+        exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
+
+        print_status "Setting the maximum file upload size in PHP to 5MB..."
+        exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.3/apache2/php.ini"
+
+        print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
+        exec_cmd "rm -r /var/www/html"
+        exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
+        exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
+        exec_cmd "rm /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
+        exec_cmd "chown -R www-data: /var/www/simplerisk"
+        exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
+        exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
+        exec_cmd "rm /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
+        exec_cmd "chown -R www-data: /var/www/simplerisk"
+
+        print_status "Configuring Apache..."
+        exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
+        if [ ! `grep -q "RewriteEngine On" /etc/apache2/sites-enabled/000-default.conf` ]; then
+                exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf"
+        fi
+        exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf"
+        if [ ! `grep -q "AllowOverride all" /etc/apache2/sites-enabled/default-ssl.conf` ]; then
+                exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf"
+        fi
+
+        print_status "Restarting Apache to load the new configuration..."
+        exec_cmd "service apache2 restart"
+
+        print_status "Generating MariaDB passwords..."
+        exec_cmd "apt-get install -y pwgen"
+        NEW_MYSQL_ROOT_PASSWORD=`pwgen -c -n -1 20`
+        MYSQL_SIMPLERISK_PASSWORD=`pwgen -c -n -1 20`
+        echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
+        echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
+        chmod 600 /root/passwords.txt
+
+        print_status "Configuring MariaDB..."
+        #exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/conf.d/mysql.cnf"
+        exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
+        exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+
+        exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
+        exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost'\""
+        exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
+        exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+
+        print_status "Setting the SimpleRisk database password..."
+        exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+
+        print_status "Restarting MariaDB to load the new configuration..."
+        exec_cmd "service mariadb restart"
+
+        print_status "Removing the SimpleRisk install directory..."
+        exec_cmd "rm -r /var/www/simplerisk/install"
+
+	print_status "Installing UFW firewall..."
+	exec_cmd "apt-get install -y ufw"
+
+        print_status "Enabling UFW firewall..."
+        exec_cmd "ufw allow ssh"
+        exec_cmd "ufw allow http"
+        exec_cmd "ufw allow https"
+        exec_cmd "ufw --force enable"
+
+        print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
+        print_status "INSTALLATION COMPLETED SUCCESSFULLY"
+}
+
 setup_ubuntu_1804(){
 	# Get the current SimpleRisk release version
 	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
@@ -644,6 +764,12 @@ validate_os(){
 		"Red Hat Enterprise Linux")
 			if [ "$2" = "8.0" ] || [ "$2" = "8.1" ] || [ "$2" = "8.2" ] || [ "$2" = "8.3" ]; then
 				detected_os_proceed "$1" "$2" && setup_rhel_8 && exit 0
+			else
+				detected_os_but_unsupported_version "$1" "$2"
+			fi;;
+		"Debian GNU/Linux")
+			if [ "$2" = "10.0" ]; then
+				detected_os_proceed "$1" "$2" && setup_debian_10 && exit 0
 			else
 				detected_os_but_unsupported_version "$1" "$2"
 			fi;;
