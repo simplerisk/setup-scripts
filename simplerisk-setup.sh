@@ -139,6 +139,11 @@ setup_debian_10(){
         exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
         exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
+        cat << EOF >> /etc/mysql/my.cnf
+[mysqld]
+sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+EOF
+
         print_status "Setting the SimpleRisk database password..."
         exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
 
