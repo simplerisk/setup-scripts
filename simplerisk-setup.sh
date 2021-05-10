@@ -264,17 +264,17 @@ setup_centos_rhel(){
 	echo "IncludeOptional sites-enabled/*.conf" >> /etc/httpd/conf/httpd.conf
 	cat << EOF > /etc/httpd/sites-enabled/simplerisk.conf
 <VirtualHost *:80>
-DocumentRoot "/var/www/simplerisk/"
-ErrorLog /var/log/httpd/error_log
-CustomLog /var/log/httpd/access_log combined
-<Directory "/var/www/simplerisk/">
-AllowOverride all
-allow from all
-Options -Indexes
-</Directory>
-RewriteEngine On
-RewriteCond %{HTTPS} !=on
-RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+	DocumentRoot "/var/www/simplerisk/"
+	ErrorLog /var/log/httpd/error_log
+	CustomLog /var/log/httpd/access_log combined
+	<Directory "/var/www/simplerisk/">
+		AllowOverride all
+		allow from all
+		Options -Indexes
+	</Directory>
+	RewriteEngine On
+	RewriteCond %{HTTPS} !=on
+	RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
 </VirtualHost>
 EOF
 
