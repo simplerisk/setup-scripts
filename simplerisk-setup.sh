@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 
 ###########################################
@@ -8,7 +8,7 @@
 # OR
 # wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
 ###########################################
-set +e
+set -eo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 print_status() {
@@ -41,10 +41,14 @@ check_root() {
 	fi
 }
 
+create_random_password() {
+	echo "$(< /dev/urandom tr -dc A-Za-z0-9 | head -c20)"
+}
+
 generate_passwords() {
 	print_status "Generating MySQL passwords..."
-	NEW_MYSQL_ROOT_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
-	MYSQL_SIMPLERISK_PASSWORD=`< /dev/urandom tr -dc A-Za-z0-9 | head -c20`
+	NEW_MYSQL_ROOT_PASSWORD=$(create_random_password)
+	MYSQL_SIMPLERISK_PASSWORD=$(create_random_password)
 	echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
 	echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
 	chmod 600 /root/passwords.txt
@@ -68,7 +72,7 @@ set_up_simplerisk() {
 
 get_simplerisk_version() {
 	# Get the current SimpleRisk release version
-        CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+        CURRENT_SIMPLERISK_VERSION=$(curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1)
 }
 
 setup_ubuntu_debian(){
@@ -85,7 +89,7 @@ setup_ubuntu_debian(){
 	print_status "Updating current packages (this may take a bit)..."
 	exec_cmd "apt-get dist-upgrade -qq --assume-yes"
 
-	if [ ${OS} = "Ubuntu" ]; then
+	if [ "${OS}" = "Ubuntu" ]; then
 		print_status "Installing lamp-server..."
 		exec_cmd "apt-get install -y lamp-server^"
 	else
@@ -535,9 +539,9 @@ validate_os(){
 			fi;;
 		"Debian GNU/Linux")
 			if [ "${VER}" = "10" ]; then
-				detected_os_proceed "$1" "$2" && setup_ubuntu_debian && exit 0
+				detected_os_proceed && setup_ubuntu_debian && exit 0
 			else
-				detected_os_but_unsupported_version "$1" "$2"
+				detected_os_but_unsupported_version
 			fi;;
 		*)
 			echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS. Exiting." && exit 1;;
