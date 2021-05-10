@@ -3,6 +3,73 @@ pipeline {
 	stages {
 		stage("Setup Script Deployment") {
 			parallel {
+				stage("Debian 10") {
+					stages {
+						stage("Script On Server") {
+							agent {
+								label "debian10"
+							}
+							steps {
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/debian10", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
+									}
+									debian_instance_id = getInstanceId()
+								}
+								callScriptOnServer()
+							}
+							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${debian_instance_id}", "us-east-1")
+									}
+								}
+								failure {
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+										}
+									}
+								}
+							}
+						}
+						stage("Through Web URL") {
+							agent {
+								label "debian10"
+							}
+							steps {
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/debian10", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
+									}
+									debian_instance_id = getInstanceId()
+								}
+								callScriptFromURL()
+							}
+							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${debian_instance_id}", "us-east-1")
+									}
+								}
+								success {
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "success", context: "setup-scripts/debian10", description: "SimpleRisk installed successfully.", targetUrl: "$BUILD_URL")
+										}
+									}
+								}
+								failure {
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 				stage("Ubuntu 18.04") {
 					stages {
 						stage("Script On Server") {
