@@ -755,13 +755,7 @@ validate_os(){
 				detected_os_but_unsupported_version
 			fi;;
 		"Debian GNU/Linux")
-			if [ "$2" = "10" ]; then
-				detected_os_proceed "$1" "$2" && setup_debian_10 && exit 0
-			else
-				detected_os_but_unsupported_version "$1" "$2"
-			fi;;
-		"Debian GNU/Linux")
-			if [ "$2" = "10" ]; then
+			if [ "${VER}" = "10" ]; then
 				detected_os_proceed "$1" "$2" && setup_debian_10 && exit 0
 			else
 				detected_os_but_unsupported_version "$1" "$2"
