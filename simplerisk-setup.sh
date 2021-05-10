@@ -2,7 +2,14 @@
 
 
 ###########################################
-# SIMPLERISK SETUP SCRIPT FOR UBUNTU 18.04
+# SIMPLERISK SETUP SCRIPT
+# Currently works for:
+# - Debian 10
+# - Ubuntu 18.04, 20.04
+# - CentOS 7
+# - Red Hat Enterprise Linux (RHEL) 8
+# - SUSE Linux Enterprise Server (SLES) 12, 15
+#
 # Run as root or insert `sudo -E` before `bash`: 
 # curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
 # OR
