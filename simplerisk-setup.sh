@@ -122,16 +122,7 @@ setup_debian_10(){
         print_status "Setting the maximum file upload size in PHP to 5MB..."
         exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.3/apache2/php.ini"
 
-        print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
-        exec_cmd "rm -r /var/www/html"
-        exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-        exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-        exec_cmd "rm /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-        exec_cmd "chown -R www-data: /var/www/simplerisk"
-        exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-        exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-        exec_cmd "rm /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-        exec_cmd "chown -R www-data: /var/www/simplerisk"
+	set_up_simplerisk "www-data"
 
         print_status "Configuring Apache..."
         exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
@@ -146,13 +137,7 @@ setup_debian_10(){
         print_status "Restarting Apache to load the new configuration..."
         exec_cmd "service apache2 restart"
 
-        print_status "Generating MariaDB passwords..."
-        exec_cmd "apt-get install -y pwgen"
-        NEW_MYSQL_ROOT_PASSWORD=`pwgen -c -n -1 20`
-        MYSQL_SIMPLERISK_PASSWORD=`pwgen -c -n -1 20`
-        echo "MYSQL ROOT PASSWORD: ${NEW_MYSQL_ROOT_PASSWORD}" >> /root/passwords.txt
-        echo "MYSQL SIMPLERISK PASSWORD: ${MYSQL_SIMPLERISK_PASSWORD}" >> /root/passwords.txt
-        chmod 600 /root/passwords.txt
+	generate_passwords
 
         print_status "Configuring MariaDB..."
         #exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/conf.d/mysql.cnf"
