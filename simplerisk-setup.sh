@@ -66,9 +66,13 @@ set_up_simplerisk() {
 	exec_cmd "chown -R ${1}: /var/www/simplerisk"
 }
 
-setup_debian_10(){
-        # Get the current SimpleRisk release version
+get_simplerisk_version() {
+	# Get the current SimpleRisk release version
         CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+}
+
+setup_debian_10(){
+	get_simplerisk_version
 
         print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
@@ -177,8 +181,7 @@ EOF
 }
 
 setup_ubuntu(){
-	# Get the current SimpleRisk release version
-	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+	get_simplerisk_version
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
@@ -284,8 +287,7 @@ setup_ubuntu(){
 }
 
 setup_centos_7(){
-	# Get the current SimpleRisk release version
-	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+	get_simplerisk_version
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
@@ -428,8 +430,7 @@ EOF
 }
 
 setup_rhel_8(){
-	# Get the current SimpleRisk release version
-	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+	get_simplerisk_version
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
@@ -567,8 +568,7 @@ EOF
 }
 
 setup_suse(){
-	# Get the current SimpleRisk release version
-	CURRENT_SIMPLERISK_VERSION=`curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1`
+	get_simplerisk_version
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
