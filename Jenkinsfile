@@ -3,6 +3,73 @@ pipeline {
 	stages {
 		stage("Setup Script Deployment") {
 			parallel {
+				stage("Debian 10") {
+					stages {
+						stage("Script On Server") {
+							agent {
+								label "debian10"
+							}
+							steps {
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/debian10", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
+									}
+									debian_instance_id = getInstanceId()
+								}
+								callScriptOnServer()
+							}
+							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${debian_instance_id}", "us-east-1")
+									}
+								}
+								failure {
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+										}
+									}
+								}
+							}
+						}
+						stage("Through Web URL") {
+							agent {
+								label "debian10"
+							}
+							steps {
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/debian10", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
+									}
+									debian_instance_id = getInstanceId()
+								}
+								callScriptFromURL()
+							}
+							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${debian_instance_id}", "us-east-1")
+									}
+								}
+								success {
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "success", context: "setup-scripts/debian10", description: "SimpleRisk installed successfully.", targetUrl: "$BUILD_URL")
+										}
+									}
+								}
+								failure {
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 				stage("Ubuntu 18.04") {
 					stages {
 						stage("Script On Server") {
@@ -14,35 +81,20 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu18", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
 									}
+									u18_instance_id = getInstanceId()
 								}
-								ubuntuReconfiguredpkg()
 								callScriptOnServer()
-								script {
-									u18_instance_id = getInstanceId() 
-								}
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${u18_instance_id}", "us-east-1")
+									}
+								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu18", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-										}
-									}
-								}
-							}
-						}
-						stage("Discard Server") {
-							agent {
-								label "jenkins"
-							}
-							steps {
-								terminateInstance("${u18_instance_id}", "us-east-1")
-							}
-							post {
-								failure {
-									script {
-										if (env.CHANGE_ID) {
-											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu18", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
 										}
 									}
 								}
@@ -57,14 +109,16 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu18", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
 									}
+									u18_instance_id = getInstanceId()
 								}
-								ubuntuReconfiguredpkg()
 								callScriptFromURL()
-								script {
-									u18_instance_id = getInstanceId() 
-								}
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${u18_instance_id}", "us-east-1")
+									}
+								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -81,14 +135,6 @@ pipeline {
 								}
 							}
 						}
-						stage("Discard Server (2)") {
-							agent {
-								label "jenkins"
-							}
-							steps {
-								terminateInstance("${u18_instance_id}", "us-east-1", 5)
-							}
-						}
 					}
 				}
 				stage('Ubuntu 20.04') {
@@ -102,35 +148,20 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu20", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
 									}
+									u20_instance_id = getInstanceId()
 								}
-								ubuntuReconfiguredpkg()
 								callScriptOnServer()
-								script {
-									u20_instance_id = getInstanceId() 
-								}
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${u20_instance_id}", "us-east-1")
+									}
+								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu20", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-										}
-									}
-								}
-							}
-						}
-						stage('Discard Server') {
-							agent {
-								label 'jenkins'
-							}
-							steps {
-								terminateInstance("${u20_instance_id}", "us-east-1")
-							}
-							post {
-								failure {
-									script {
-										if (env.CHANGE_ID) {
-											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu20", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
 										}
 									}
 								}
@@ -145,11 +176,16 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu20", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
 									}
+									u20_instance_id = getInstanceId()
 								}
-								ubuntuReconfiguredpkg()
 								callScriptFromURL()
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${u20_instance_id}", "us-east-1")
+									}
+								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -166,14 +202,6 @@ pipeline {
 								}
 							}
 						}
-						stage("Discard Server (2)") {
-							agent {
-								label "jenkins"
-							}
-							steps {
-								terminateInstance("${u20_instance_id}", "us-east-1", 5)
-							}
-						}
 					}
 				}
 				stage('SLES 12') {
@@ -187,34 +215,21 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/sles12", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
 									}
+									sles12_instance_id = getInstanceId()
 								}
+								suseRegisterCloudGuest()
 								callScriptOnServer()
-								script {
-									sles_instance_id = getInstanceId() 
-								}
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${sles12_instance_id}", "us-east-1")
+									}
+								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles12", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-										}
-									}
-								}
-							}
-						}
-						stage('Discard Server') {
-							agent {
-								label 'jenkins'
-							}
-							steps {
-								terminateInstance("${sles_instance_id}", "us-east-1")
-							}
-							post {
-								failure {
-									script {
-										if (env.CHANGE_ID) {
-											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles12", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
 										}
 									}
 								}
@@ -229,13 +244,17 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/sles12", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
 									}
+									sles12_instance_id = getInstanceId()
 								}
+								suseRegisterCloudGuest()
 								callScriptFromURL()
-								script {
-									sles_instance_id = getInstanceId() 
-								}
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${sles12_instance_id}", "us-east-1")
+									}
+								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -252,12 +271,71 @@ pipeline {
 								}
 							}
 						}
-						stage("Discard Server (2)") {
+					}
+				}
+				stage('SLES 15') {
+					stages {
+						stage('Script On Server') {
 							agent {
-								label "jenkins"
+								label 'sles15'
 							}
 							steps {
-								terminateInstance("${sles_instance_id}", "us-east-1", 5)
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/sles15", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
+									}
+									sles15_instance_id = getInstanceId()
+								}
+								callScriptOnServer()
+							}
+							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${sles15_instance_id}", "us-east-1")
+									}
+								}
+								failure {
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles15", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+										}
+									}
+								}
+							}
+						}
+						stage('Through Web URL') {
+							agent {
+								label 'sles15'
+							}
+							steps {
+								script {
+									if (env.CHANGE_ID) {
+										pullRequest.createStatus(status: "pending", context: "setup-scripts/sles15", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
+									}
+									sles15_instance_id = getInstanceId()
+								}
+								callScriptFromURL()
+							}
+							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${sles15_instance_id}", "us-east-1")
+									}
+								}
+								success {
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "success", context: "setup-scripts/sles15", description: "SimpleRisk installed successfully.", targetUrl: "$BUILD_URL")
+										}
+									}
+								}
+								failure {
+									script {
+										if (env.CHANGE_ID) {
+											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles15", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+										}
+									}
+								}
 							}
 						}
 					}
@@ -273,34 +351,20 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/rhel8", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
 									}
-								}
-								callScriptOnServer()
-								script {
 									rhel_instance_id = getInstanceId()
 								}
+								callScriptOnServer()
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${rhel_instance_id}", "us-east-1")
+									}
+								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/rhel8", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-										}
-									}
-								}
-							}
-						}
-						stage('Discard Server') {
-							agent {
-								label 'jenkins'
-							}
-							steps {
-								terminateInstance("${rhel_instance_id}", "us-east-1")
-							}
-							post {
-								failure {
-									script {
-										if (env.CHANGE_ID) {
-											pullRequest.createStatus(status: "failure", context: "setup-scripts/rhel8", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
 										}
 									}
 								}
@@ -315,13 +379,16 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/rhel8", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
 									}
-								}
-								callScriptFromURL()
-								script {
 									rhel_instance_id = getInstanceId()
 								}
+								callScriptFromURL()
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${rhel_instance_id}", "us-east-1")
+									}
+								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -338,14 +405,6 @@ pipeline {
 								}
 							}
 						}
-						stage("Discard Server (2)") {
-							agent {
-								label "jenkins"
-							}
-							steps {
-								terminateInstance("${rhel_instance_id}", "us-east-1", 5)
-							}
-						}
 					}
 				}
 				stage('CentOS 7') {
@@ -359,34 +418,20 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/centos7", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL")
 									}
+									centos_instance_id = getInstanceId()
 								}
 								callScriptOnServer()
-								script {
-									centos_instance_id = getInstanceId()
-								}	
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${centos_instance_id}", "us-east-1")
+									}
+								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/centos7", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-										}
-									}
-								}
-							}
-						}
-						stage('Discard Server') {
-							agent {
-								label 'jenkins'
-							}
-							steps {
-								terminateInstance("${centos_instance_id}", "us-east-1")
-							}
-							post {
-								failure {
-									script {
-										if (env.CHANGE_ID) {
-											pullRequest.createStatus(status: "failure", context: "setup-scripts/centos7", description: "Couldn't destroy server.", targetUrl: "$BUILD_URL")
 										}
 									}
 								}
@@ -401,13 +446,16 @@ pipeline {
 									if (env.CHANGE_ID) {
 										pullRequest.createStatus(status: "pending", context: "setup-scripts/centos7", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL")
 									}
-								}
-								callScriptFromURL()
-								script {
 									centos_instance_id = getInstanceId()
 								}
+								callScriptFromURL()
 							}
 							post {
+								always {
+									node("jenkins") {
+										terminateInstance("${centos_instance_id}", "us-east-1")
+									}
+								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -422,14 +470,6 @@ pipeline {
 										}
 									}
 								}
-							}
-						}
-						stage("Discard Server (2)") {
-							agent {
-								label "jenkins"
-							}
-							steps {
-								terminateInstance("${centos_instance_id}", "us-east-1", 5)
 							}
 						}
 					}
@@ -460,6 +500,16 @@ void callScriptFromURL() {
 
 void validateStatusCode(String urlToCheck="https://localhost") {
 	sh "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -k $urlToCheck)\" = \"200\" ] && exit 0 || exit 1"
+}
+
+void suseRegisterCloudGuest() {
+	sh """
+		sudo rm /etc/SUSEConnect
+		sudo rm -f /etc/zypp/{repos,services,credentials}.d/*
+		sudo rm -f /usr/lib/zypp/plugins/services/*
+		sudo sed -i '/^# Added by SMT reg/,+1d' /etc/hosts
+		sudo /usr/sbin/registercloudguest --force-new
+	"""
 }
 
 void ubuntuReconfiguredpkg() {
