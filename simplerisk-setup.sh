@@ -143,13 +143,14 @@ setup_ubuntu_debian(){
 	exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
 	exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
-	print_status "Setting the maximum file upload size in PHP to 5MB..."
+	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
 	if [ "${OS}" = "Ubuntu" ]; then
 		[ "${VER}" = "20.04" ] && local php_version="7.4" || local php_version="7.2"
 	else
 		local php_version="7.3"
 	fi
-	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/$php_version/apache2/php.ini"
+	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php/$php_version/apache2/php.ini"
+	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
 
 	set_up_simplerisk "www-data"
 
@@ -249,6 +250,10 @@ setup_centos_rhel(){
 		exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
 		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-mbstring php-xml php-curl php-ldap"
 	fi
+
+	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
+	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php.ini"
+	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php.ini"
 
 	print_status "Installing the MariaDB database server..."
 	exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
@@ -485,8 +490,9 @@ EOF
 	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
 	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
-	print_status "Setting the maximum file upload size in PHP to 5MB..."
-	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php7/apache2/php.ini"
+	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
+	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php7/apache2/php.ini"
+	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php7/apache2/php.ini"
 
 	set_up_simplerisk "wwwrun"
 
