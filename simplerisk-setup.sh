@@ -77,6 +77,10 @@ set_up_simplerisk() {
 	exec_cmd "chown -R ${1}: /var/www/simplerisk"
 }
 
+set_up_backup_cronjob() {
+	exec_cmd "(crontab -l 2>/dev/null; echo \"* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php\") | crontab -"
+}
+
 get_simplerisk_version() {
 	# Get the current SimpleRisk release version
         CURRENT_SIMPLERISK_VERSION=$(curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1)
@@ -201,6 +205,9 @@ fi
 	print_status "Removing the SimpleRisk install directory..."
 	exec_cmd "rm -r /var/www/simplerisk/install"
 
+	print_status "Setting up Backup cronjob..."
+	set_up_backup_cronjob
+
 	if [ "${OS}" = "Debian GNU/Linux" ]; then
 		print_status "Installing UFW firewall..."
 		exec_cmd "apt-get install -y ufw"
@@ -319,6 +326,9 @@ EOF
 
 	print_status "Removing the SimpleRisk install directory..."
 	exec_cmd "rm -r /var/www/simplerisk/install"
+
+	print_status "Setting up Backup cronjob..."
+	set_up_backup_cronjob
 
 	print_status "Enabling and starting the Apache web server..."
 	exec_cmd "systemctl enable httpd"
@@ -505,6 +515,9 @@ EOF
 
 	print_status "Removing the SimpleRisk install directory..."
 	exec_cmd "rm -r /var/www/simplerisk/install"
+
+	print_status "Setting up Backup cronjob..."
+	set_up_backup_cronjob
 
 	print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
