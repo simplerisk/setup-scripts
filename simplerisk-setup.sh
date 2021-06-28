@@ -242,7 +242,7 @@ setup_centos_rhel(){
 
 	print_status "Installing PHP for Apache..."
 	if [ "${OS}" = "Red Hat Enterprise Linux" ]; then
-		exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap php-curl php-xml"
+		exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap php-curl php-xml php-process"
 	else
 		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 		exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
@@ -416,7 +416,7 @@ setup_suse(){
 	exec_cmd "systemctl start mysql"
 
 	print_status "Installing PHP 7..."
-	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring"
+	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring php-posix"
 	exec_cmd "a2enmod php7"
 
 	print_status "Enabling SSL for Apache..."
