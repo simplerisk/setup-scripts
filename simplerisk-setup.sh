@@ -77,6 +77,10 @@ set_up_simplerisk() {
 	exec_cmd "chown -R ${1}: /var/www/simplerisk"
 }
 
+set_up_backup_cronjob() {
+	exec_cmd "(crontab -l 2>/dev/null; echo \"* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php\") | crontab -"
+}
+
 get_simplerisk_version() {
 	# Get the current SimpleRisk release version
         CURRENT_SIMPLERISK_VERSION=$(curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1)
@@ -139,13 +143,14 @@ setup_ubuntu_debian(){
 	exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
 	exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
-	print_status "Setting the maximum file upload size in PHP to 5MB..."
+	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
 	if [ "${OS}" = "Ubuntu" ]; then
 		[ "${VER}" = "20.04" ] && local php_version="7.4" || local php_version="7.2"
 	else
 		local php_version="7.3"
 	fi
-	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/$php_version/apache2/php.ini"
+	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php/$php_version/apache2/php.ini"
+	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
 
 	set_up_simplerisk "www-data"
 
@@ -201,6 +206,9 @@ fi
 	print_status "Removing the SimpleRisk install directory..."
 	exec_cmd "rm -r /var/www/simplerisk/install"
 
+	print_status "Setting up Backup cronjob..."
+	set_up_backup_cronjob
+
 	if [ "${OS}" = "Debian GNU/Linux" ]; then
 		print_status "Installing UFW firewall..."
 		exec_cmd "apt-get install -y ufw"
@@ -235,13 +243,17 @@ setup_centos_rhel(){
 
 	print_status "Installing PHP for Apache..."
 	if [ "${OS}" = "Red Hat Enterprise Linux" ]; then
-		exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap php-curl php-xml"
+		exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap php-curl php-xml php-process"
 	else
 		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 		exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
 		exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
 		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-mbstring php-xml php-curl php-ldap"
 	fi
+
+	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
+	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php.ini"
+	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php.ini"
 
 	print_status "Installing the MariaDB database server..."
 	exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
@@ -319,6 +331,9 @@ EOF
 
 	print_status "Removing the SimpleRisk install directory..."
 	exec_cmd "rm -r /var/www/simplerisk/install"
+
+	print_status "Setting up Backup cronjob..."
+	set_up_backup_cronjob
 
 	print_status "Enabling and starting the Apache web server..."
 	exec_cmd "systemctl enable httpd"
@@ -406,7 +421,7 @@ setup_suse(){
 	exec_cmd "systemctl start mysql"
 
 	print_status "Installing PHP 7..."
-	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring"
+	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring php-posix"
 	exec_cmd "a2enmod php7"
 
 	print_status "Enabling SSL for Apache..."
@@ -475,8 +490,9 @@ EOF
 	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
 	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
-	print_status "Setting the maximum file upload size in PHP to 5MB..."
-	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php7/apache2/php.ini"
+	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
+	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php7/apache2/php.ini"
+	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php7/apache2/php.ini"
 
 	set_up_simplerisk "wwwrun"
 
@@ -505,6 +521,9 @@ EOF
 
 	print_status "Removing the SimpleRisk install directory..."
 	exec_cmd "rm -r /var/www/simplerisk/install"
+
+	print_status "Setting up Backup cronjob..."
+	set_up_backup_cronjob
 
 	print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
