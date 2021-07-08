@@ -28,6 +28,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -63,6 +64,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -95,6 +97,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu18", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -130,6 +133,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu18", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -162,6 +166,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu20", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -197,6 +202,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu20", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -230,6 +236,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles12", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -266,6 +273,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles12", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -298,6 +306,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles15", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -333,6 +342,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles15", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -365,6 +375,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/rhel8", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -400,6 +411,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/rhel8", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -432,6 +444,7 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/centos7", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
@@ -467,12 +480,18 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/centos7", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
+											sendErrorEmail()
 										}
 									}
 								}
 							}
 						}
 					}
+				}
+			}
+			post {
+				success {
+					sendSuccessEmail()
 				}
 			}
 		}
@@ -500,6 +519,20 @@ void callScriptFromURL() {
 
 void validateStatusCode(String urlToCheck="https://localhost") {
 	sh "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -k $urlToCheck)\" = \"200\" ] && exit 0 || exit 1"
+}
+
+void sendEmail(String status, String message) {
+        mail from: 'jenkins@simplerisk.com', to: "$env.GIT_AUTHOR_EMAIL", bcc: '',  cc: 'pedro@simplerisk.com', replyTo: '',
+             subject: """${env.JOB_BASE_NAME} (Branch ${env.BRANCH_NAME}) - Build # ${env.BUILD_NUMBER} - ${status}""",
+             body: """Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed flow of execution)."""
+}
+
+void sendErrorEmail() {
+        sendEmail("Failure", """Build failed at stage \"${env.STAGE_NAME}\". Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed execution flow).""")
+}
+
+void sendSuccessEmail() {
+        sendEmail("Success", """Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed execution flow).""")
 }
 
 void suseRegisterCloudGuest() {
