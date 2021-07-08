@@ -258,7 +258,7 @@ setup_centos_rhel(){
 	print_status "Installing the MariaDB database server..."
 	exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
 	if [ "${OS}" = "Red Hat Enterprise Linux" ]; then
-		exec_cmd "yum -y install perl-DBI libaio libsepol lsof boost-program-options"
+		exec_cmd "yum -y install perl-DBI libaio libsepol lsof boost-program-options libpmem galera-4"
 		exec_cmd "yum -y install --repo=\"mariadb-main\" MariaDB-server"
 	else
 		exec_cmd "yum -y install MariaDB-server"
