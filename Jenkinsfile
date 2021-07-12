@@ -523,7 +523,7 @@ void validateStatusCode(String urlToCheck="https://localhost") {
 
 void sendEmail(String status, String message) {
         mail from: 'jenkins@simplerisk.com', to: "$env.GIT_AUTHOR_EMAIL", bcc: '',  cc: 'pedro@simplerisk.com', replyTo: '',
-             subject: """${env.JOB_BASE_NAME} (Branch ${env.BRANCH_NAME}) - Build # ${env.BUILD_NUMBER} - ${currentBuild.currentResult}""",
+             subject: """${env.JOB_NAME} (Branch ${env.BRANCH_NAME}) - Build # ${env.BUILD_NUMBER} - ${currentBuild.currentResult}""",
              body: """Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed flow of execution)."""
 }
 
