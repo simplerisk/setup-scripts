@@ -1,3 +1,4 @@
+	}
 pipeline {
 	agent none
 	stages {
@@ -524,11 +525,11 @@ void validateStatusCode(String urlToCheck="https://localhost") {
 void sendEmail(String message) {
         mail from: 'jenkins@simplerisk.com', to: "$env.GIT_AUTHOR_EMAIL", bcc: '',  cc: 'pedro@simplerisk.com', replyTo: '',
              subject: """${env.JOB_NAME} (Branch ${env.BRANCH_NAME}) - Build # ${env.BUILD_NUMBER} - ${currentBuild.currentResult}""",
-             body: """Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed flow of execution)."""
+             body: "$message"
 }
 
 void sendErrorEmail() {
-        sendEmail("""Build failed at stage \"${env.STAGE_NAME}\". Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed execution flow).""")
+        sendEmail("""Job failed at stage \"${env.STAGE_NAME}\". Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed execution flow).""")
 }
 
 void sendSuccessEmail() {
