@@ -1,4 +1,3 @@
-	}
 pipeline {
 	agent none
 	stages {
@@ -21,7 +20,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${debian_instance_id}", "us-east-1")
 									}
 								}
@@ -50,7 +49,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${debian_instance_id}", "us-east-1")
 									}
 								}
@@ -90,7 +89,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${u18_instance_id}", "us-east-1")
 									}
 								}
@@ -119,7 +118,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${u18_instance_id}", "us-east-1")
 									}
 								}
@@ -159,7 +158,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${u20_instance_id}", "us-east-1")
 									}
 								}
@@ -188,7 +187,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${u20_instance_id}", "us-east-1")
 									}
 								}
@@ -229,7 +228,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${sles12_instance_id}", "us-east-1")
 									}
 								}
@@ -259,7 +258,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${sles12_instance_id}", "us-east-1")
 									}
 								}
@@ -299,7 +298,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${sles15_instance_id}", "us-east-1")
 									}
 								}
@@ -328,7 +327,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${sles15_instance_id}", "us-east-1")
 									}
 								}
@@ -368,7 +367,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${rhel_instance_id}", "us-east-1")
 									}
 								}
@@ -397,7 +396,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${rhel_instance_id}", "us-east-1")
 									}
 								}
@@ -437,7 +436,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${centos_instance_id}", "us-east-1")
 									}
 								}
@@ -466,7 +465,7 @@ pipeline {
 							}
 							post {
 								always {
-									node("jenkins") {
+									node("terminator") {
 										terminateInstance("${centos_instance_id}", "us-east-1")
 									}
 								}
