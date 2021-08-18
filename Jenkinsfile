@@ -19,11 +19,6 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${debian_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
@@ -31,6 +26,12 @@ pipeline {
 											sendErrorEmail("debian_10/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${debian_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${debian_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -48,11 +49,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${debian_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -67,6 +63,12 @@ pipeline {
 											sendErrorEmail("debian_10/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${debian_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${debian_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -88,11 +90,6 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${u18_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
@@ -100,6 +97,12 @@ pipeline {
 											sendErrorEmail("ubuntu_1804/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${u18_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${u18_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -117,11 +120,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${u18_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -136,6 +134,12 @@ pipeline {
 											sendErrorEmail("ubuntu_1804/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${u18_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${u18_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -157,11 +161,6 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${u20_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
@@ -169,6 +168,12 @@ pipeline {
 											sendErrorEmail("ubuntu_2004/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${u20_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${u20_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -186,11 +191,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${u20_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -205,6 +205,12 @@ pipeline {
 											sendErrorEmail("ubuntu_2004/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${u20_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${u20_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -227,11 +233,6 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${sles12_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
@@ -239,6 +240,12 @@ pipeline {
 											sendErrorEmail("sles_12/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${sles12_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${sles12_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -257,11 +264,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${sles12_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -276,6 +278,12 @@ pipeline {
 											sendErrorEmail("sles_12/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${sles12_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${sles12_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -297,11 +305,6 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${sles15_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
@@ -309,6 +312,12 @@ pipeline {
 											sendErrorEmail("sles_15/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${sles15_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${sles15_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -326,11 +335,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${sles15_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -345,6 +349,12 @@ pipeline {
 											sendErrorEmail("sles_15/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${sles15_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${sles15_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -366,11 +376,6 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${rhel_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
@@ -378,6 +383,12 @@ pipeline {
 											sendErrorEmail("rhel_8/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${rhel_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${rhel_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -395,11 +406,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${rhel_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -414,6 +420,12 @@ pipeline {
 											sendErrorEmail("rhel_8/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${rhel_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${rhel_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -435,11 +447,6 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${centos_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
@@ -447,6 +454,12 @@ pipeline {
 											sendErrorEmail("centos_7/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${centos_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${centos_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -464,11 +477,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("terminator") {
-										terminateInstance("${centos_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -483,6 +491,12 @@ pipeline {
 											sendErrorEmail("centos_7/${env.STAGE_NAME}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${centos_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${centos_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -508,8 +522,10 @@ def getInstanceId() {
 }
 
 void terminateInstance(String instanceId, String region, Integer number=60) {
-	sh "aws ec2 terminate-instances --instance-ids $instanceId --region $region"
-	sh "sleep $number"
+	node("terminator") {
+		sh "aws ec2 terminate-instances --instance-ids $instanceId --region $region"
+		sh "sleep $number"
+	}
 }
 
 void callScriptFromURL() {
