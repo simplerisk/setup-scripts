@@ -97,6 +97,9 @@ setup_debian_10(){
         print_status "Setting the maximum file upload size in PHP to 5MB..."
         exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.3/apache2/php.ini"
 
+	print_status "Setting the maximum input variables in PHP to 3000..."
+	exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php/7.3/apache2/php.ini"
+
         print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
         exec_cmd "rm -r /var/www/html"
         exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
@@ -222,6 +225,14 @@ setup_ubuntu_1804(){
 	else
 		exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini"
 	fi
+
+        print_status "Setting the maximum input variables in PHP to 3000..."
+	if [ "$VER" = "20.04" ]; then
+		exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php/7.4/apache2/php.ini"
+	else
+        	exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php/7.2/apache2/php.ini"
+	fi
+
 	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
 	exec_cmd "rm -r /var/www/html"
 	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
@@ -688,6 +699,9 @@ setup_suse_12(){
 
 	print_status "Setting the maximum file upload size in PHP to 5MB..."
 	exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php7/apache2/php.ini"
+
+        print_status "Setting the maximum input variables in PHP to 3000..."
+        exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php7/apache2/php.ini"
 
 	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
 	exec_cmd "mkdir /var/www/"
