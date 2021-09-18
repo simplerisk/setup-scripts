@@ -99,6 +99,9 @@ exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-
 print_status "Setting the maximum file upload size in PHP to 5MB..."
 exec_cmd "sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 5M/g' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
 
+print_status "Setting the maximum input variables in PHP to 3000..."
+exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php/7.2/apache2/php.ini > /dev/null 2>&1"
+
 print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
 exec_cmd "rm -r /var/www/html"
 exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz > /dev/null 2>&1"

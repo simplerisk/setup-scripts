@@ -151,6 +151,9 @@ setup_ubuntu_debian(){
 	fi
 	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php/$php_version/apache2/php.ini"
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
+	
+	print_status "Setting the maximum input variables in PHP to 3000..."
+	exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php/$php_version/apache2/php.ini"
 
 	set_up_simplerisk "www-data"
 
@@ -254,6 +257,9 @@ setup_centos_rhel(){
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
 	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php.ini"
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php.ini"
+
+	print_status "Setting the maximum input variables in PHP to 3000..."
+	exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php.ini"
 
 	print_status "Installing the MariaDB database server..."
 	exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
@@ -496,6 +502,9 @@ EOF
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
 	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php7/apache2/php.ini"
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php7/apache2/php.ini"
+
+	print_status "Setting the maximum input variables in PHP to 3000..."
+	exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php7/apache2/php.ini"
 
 	set_up_simplerisk "wwwrun"
 
