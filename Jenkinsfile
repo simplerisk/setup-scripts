@@ -1,6 +1,19 @@
 pipeline {
 	agent none
 	stages {
+		stage("Initializing Common Variables") {
+			agent { label "terminator" }
+			steps {
+				script {
+					committer_email = getCommitterEmail()
+				}
+			}
+			post {
+				failure {
+					sendErrorEmail("${env.STAGE_NAME}", "${committer_email}")
+				}
+			}
+		}
 		stage("Setup Script Deployment") {
 			parallel {
 				stage("Debian 10") {
@@ -19,18 +32,19 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${debian_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("debian_10/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${debian_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${debian_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -48,11 +62,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${debian_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -64,9 +73,15 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("debian_10/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${debian_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${debian_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -88,18 +103,19 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${u18_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu18", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("ubuntu_1804/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${u18_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${u18_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -117,11 +133,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${u18_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -133,9 +144,15 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu18", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("ubuntu_1804/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${u18_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${u18_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -157,18 +174,19 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${u20_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu20", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("ubuntu_2004/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${u20_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${u20_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -186,11 +204,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${u20_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -202,9 +215,15 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/ubuntu20", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("ubuntu_2004/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${u20_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${u20_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -227,18 +246,19 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${sles12_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles12", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("sles_12/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${sles12_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${sles12_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -257,11 +277,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${sles12_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -273,9 +288,15 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles12", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("sles_12/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${sles12_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${sles12_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -297,18 +318,19 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${sles15_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles15", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("sles_15/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${sles15_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${sles15_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -326,11 +348,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${sles15_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -342,9 +359,15 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/sles15", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("sles_15/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${sles15_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${sles15_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -366,18 +389,19 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${rhel_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/rhel8", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("rhel_8/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${rhel_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${rhel_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -395,11 +419,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${rhel_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -411,9 +430,15 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/rhel8", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("rhel_8/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${rhel_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${rhel_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -435,18 +460,19 @@ pipeline {
 								callScriptOnServer()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${centos_instance_id}", "us-east-1")
-									}
-								}
 								failure {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/centos7", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("centos_7/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${centos_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${centos_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -464,11 +490,6 @@ pipeline {
 								callScriptFromURL()
 							}
 							post {
-								always {
-									node("jenkins") {
-										terminateInstance("${centos_instance_id}", "us-east-1")
-									}
-								}
 								success {
 									script {
 										if (env.CHANGE_ID) {
@@ -480,9 +501,15 @@ pipeline {
 									script {
 										if (env.CHANGE_ID) {
 											pullRequest.createStatus(status: "failure", context: "setup-scripts/centos7", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL")
-											sendErrorEmail()
+											sendErrorEmail("centos_7/${env.STAGE_NAME}", "${committer_email}")
 										}
 									}
+								}
+								aborted {
+									terminateInstance("${centos_instance_id}", "us-east-1")
+								}
+								cleanup {
+									terminateInstance("${centos_instance_id}", "us-east-1")
 								}
 							}
 						}
@@ -491,25 +518,20 @@ pipeline {
 			}
 			post {
 				success {
-					sendSuccessEmail()
+					sendSuccessEmail("${committer_email}")
 				}
 			}
 		}
 	}
 }
 
-void callScriptOnServer() {
-	sh "sudo ./simplerisk-setup.sh -n -d"
-	validateStatusCode()
+
+def getCommitterEmail() {
+	return sh(script: "git --no-pager show -s --format='%ae'", returnStdout: true).trim()
 }
 
 def getInstanceId() {
 	return sh(script: 'echo $(TOKEN=`curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` && curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)', returnStdout: true).trim()
-}
-
-void terminateInstance(String instanceId, String region, Integer number=60) {
-	sh "aws ec2 terminate-instances --instance-ids $instanceId --region $region"
-	sh "sleep $number"
 }
 
 void callScriptFromURL() {
@@ -517,22 +539,24 @@ void callScriptFromURL() {
 	validateStatusCode()
 }
 
-void validateStatusCode(String urlToCheck="https://localhost") {
-	sh "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -k $urlToCheck)\" = \"200\" ] && exit 0 || exit 1"
+void callScriptOnServer() {
+	sh "sudo ./simplerisk-setup.sh -n -d"
+	validateStatusCode()
 }
 
-void sendEmail(String message) {
-        mail from: 'jenkins@simplerisk.com', to: "$env.GIT_AUTHOR_EMAIL", bcc: '',  cc: 'pedro@simplerisk.com', replyTo: '',
+
+void sendEmail(String message, String recipient) {
+        mail from: 'jenkins@simplerisk.com', to: """${recipient}""", bcc: '',  cc: 'pedro@simplerisk.com', replyTo: '',
              subject: """${env.JOB_NAME} (Branch ${env.BRANCH_NAME}) - Build # ${env.BUILD_NUMBER} - ${currentBuild.currentResult}""",
-             body: """Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed flow of execution)."""
+             body: "$message"
 }
 
-void sendErrorEmail() {
-        sendEmail("""Build failed at stage \"${env.STAGE_NAME}\". Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed execution flow).""")
+void sendErrorEmail(String stage, String recipient) {
+        sendEmail("""Job failed at stage \"${stage}\". Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed execution flow).""", "$recipient")
 }
 
-void sendSuccessEmail() {
-        sendEmail("""Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed execution flow).""")
+void sendSuccessEmail(String recipient) {
+        sendEmail("""Check console output at ${env.BUILD_URL} to view the results (The Blue Ocean option will provide the detailed execution flow).""", "$recipient")
 }
 
 void suseRegisterCloudGuest() {
@@ -553,4 +577,15 @@ void ubuntuReconfiguredpkg() {
 		sudo rm -f /var/cache/apt/archives/lock
 		sudo dpkg --configure -a
 	'''
+}
+
+void terminateInstance(String instanceId, String region, Integer number=60) {
+	node("terminator") {
+		sh "aws ec2 terminate-instances --instance-ids $instanceId --region $region"
+		sh "sleep $number"
+	}
+}
+
+void validateStatusCode(String urlToCheck="https://localhost") {
+	sh "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -k $urlToCheck)\" = \"200\" ] && exit 0 || exit 1"
 }

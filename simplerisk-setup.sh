@@ -302,6 +302,9 @@ EOF
 	fi
 	if [ "${OS}" = "CentOS Linux" ]; then
 		exec_cmd "sed -i '/<VirtualHost _default_:443>/a \\\t\tDocumentRoot "/var/www/simplerisk"' /etc/httpd/conf.d/ssl.conf"
+	else
+		exec_cmd "sed -i 's/#\(LoadModule mpm_prefork\)/\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
+		exec_cmd "sed -i 's/\(LoadModule mpm_event\)/#\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
 	fi
 
 	generate_passwords
