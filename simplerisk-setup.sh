@@ -132,6 +132,12 @@ setup_ubuntu_debian(){
 	print_status "Installing curl module for PHP..."
 	exec_cmd "apt-get install -y php-curl"
 
+	print_status "Installing the gd module for PHP..."
+	exec_cmd "apt-get install -y php-gd"
+
+	print_status "Installing the zip module for PHP..."
+	exec_cmd "apt-get install -y php-zip"
+
 	print_status "Enabling SSL for Apache..."
 	exec_cmd "a2enmod rewrite"
 	exec_cmd "a2enmod ssl"
@@ -246,12 +252,12 @@ setup_centos_rhel(){
 
 	print_status "Installing PHP for Apache..."
 	if [ "${OS}" = "Red Hat Enterprise Linux" ]; then
-		exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-json php-ldap php-curl php-xml php-process"
+		exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-process"
 	else
 		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 		exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
 		exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-mbstring php-xml php-curl php-ldap"
+		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap"
 	fi
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
@@ -430,7 +436,7 @@ setup_suse(){
 	exec_cmd "systemctl start mysql"
 
 	print_status "Installing PHP 7..."
-	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring php-posix"
+	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring php-posix php-gd php-zip"
 	exec_cmd "a2enmod php7"
 
 	print_status "Enabling SSL for Apache..."
