@@ -6,9 +6,8 @@
 # Currently works for:
 # - Debian 10
 # - Ubuntu 18.04, 20.04
-# - CentOS 7
-# - Red Hat Enterprise Linux (RHEL) 7.9
-# - Red Hat Enterprise Linux (RHEL) 8
+# - CentOS 7, 8
+# - Red Hat Enterprise Linux (RHEL) 7.9, 8
 # - SUSE Linux Enterprise Server (SLES) 12, 15
 #
 # Run as root or insert `sudo -E` before `bash`: 
@@ -259,13 +258,13 @@ setup_centos_rhel(){
 			exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
                 	exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
                 	exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-                	exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap"
+                	exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
 		fi
 	else
 		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 		exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
 		exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap"
+		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
 	fi
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
@@ -578,7 +577,9 @@ validate_os(){
 				detected_os_but_unsupported_version
 			fi;;
 		"CentOS Linux")
-			if [ "${VER}" = "7" ]; then
+			if [ "${VER}" = "8" ]; then
+				detected_os_proceed && setup_centos_rhel && exit 0
+			elif [ "${VER}" = "7" ]; then
 				detected_os_proceed && setup_centos_rhel && exit 0
 			else
 				detected_os_but_unsupported_version
