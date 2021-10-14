@@ -7,6 +7,7 @@
 # - Debian 10
 # - Ubuntu 18.04, 20.04
 # - CentOS 7
+# - Red Hat Enterprise Linux (RHEL) 7.9
 # - Red Hat Enterprise Linux (RHEL) 8
 # - SUSE Linux Enterprise Server (SLES) 12, 15
 #
@@ -159,7 +160,7 @@ setup_ubuntu_debian(){
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
 	
 	print_status "Setting the maximum input variables in PHP to 3000..."
-	exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php/$php_version/apache2/php.ini"
+	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php/$php_version/apache2/php.ini"
 
 	set_up_simplerisk "www-data"
 
@@ -251,8 +252,15 @@ setup_centos_rhel(){
 	exec_cmd "yum -y install httpd"
 
 	print_status "Installing PHP for Apache..."
-	if [ "${OS}" = "Red Hat Enterprise Linux" ]; then
-		exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-process"
+	if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
+		if [[ "${VER}" = 8* ]]; then
+			exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-process"
+		else
+			exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+                	exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
+                	exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
+                	exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap"
+		fi
 	else
 		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 		exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
@@ -265,15 +273,21 @@ setup_centos_rhel(){
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php.ini"
 
 	print_status "Setting the maximum input variables in PHP to 3000..."
-	exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php.ini"
+	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php.ini"
 
 	print_status "Installing the MariaDB database server..."
 	exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
-	if [ "${OS}" = "Red Hat Enterprise Linux" ]; then
-		exec_cmd "yum -y install perl-DBI libaio libsepol lsof boost-program-options libpmem galera-4"
-		exec_cmd "yum -y install --repo=\"mariadb-main\" MariaDB-server"
+	if [[ "${VER}" = 7.9 ]]; then
+		if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
+			exec_cmd "yum -y install MariaDB-server"
+		fi
 	else
-		exec_cmd "yum -y install MariaDB-server"
+		if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
+			exec_cmd "yum -y install perl-DBI libaio libsepol lsof boost-program-options libpmem galera-4"
+			exec_cmd "yum -y install --repo=\"mariadb-main\" MariaDB-server"
+		else
+			exec_cmd "yum -y install MariaDB-server"
+		fi
 	fi
 
 	print_status "Enabling and starting the MariaDB database server..."
@@ -286,7 +300,7 @@ setup_centos_rhel(){
 	set_up_simplerisk "apache"
 
 	print_status "Configuring Apache..."
-	if [ "${OS}" = "Red Hat Enterprise Linux" ]; then
+	if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
 		exec_cmd "sed -i 's/#DocumentRoot \"\/var\/www\/html\"/DocumentRoot \"\/var\/www\/simplerisk\"/' /etc/httpd/conf.d/ssl.conf"
 		exec_cmd "rm /etc/httpd/conf.d/welcome.conf"
 	fi
@@ -510,7 +524,7 @@ EOF
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php7/apache2/php.ini"
 
 	print_status "Setting the maximum input variables in PHP to 3000..."
-	exec_cmd "sed -i 's/; max_input_vars = 1000/max_input_vars = 3000/g' /etc/php7/apache2/php.ini"
+	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php7/apache2/php.ini"
 
 	set_up_simplerisk "wwwrun"
 
@@ -578,9 +592,19 @@ validate_os(){
 		"Red Hat Enterprise Linux")
 			if [[ "${VER}" = 8* ]]; then
 				detected_os_proceed && setup_centos_rhel && exit 0
+			elif [[ "${VER}" = 7.9 ]]; then
+				detected_os_proceed && setup_centos_rhel && exit 0
 			else
 				detected_os_but_unsupported_version
 			fi;;
+		"Red Hat Enterprise Linux Server")
+                        if [[ "${VER}" = 8* ]]; then
+                                detected_os_proceed && setup_centos_rhel && exit 0
+                        elif [[ "${VER}" = 7.9 ]]; then
+                                detected_os_proceed && setup_centos_rhel && exit 0
+                        else
+                                detected_os_but_unsupported_version
+                        fi;;
 		"Debian GNU/Linux")
 			if [ "${VER}" = "10" ]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
