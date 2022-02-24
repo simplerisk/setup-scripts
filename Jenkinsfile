@@ -100,6 +100,7 @@ pipeline {
 									}
 									u18_instance_id = getInstanceId()
 								}
+								sh "sleep 2m"
 								callScriptOnServer()
 							}
 							post {
@@ -130,6 +131,7 @@ pipeline {
 									}
 									u18_instance_id = getInstanceId()
 								}
+								sh "sleep 2m"
 								callScriptFromURL()
 							}
 							post {
