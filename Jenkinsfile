@@ -244,7 +244,6 @@ pipeline {
 									}
 									sles12_instance_id = getInstanceId()
 								}
-								suseRegisterCloudGuest()
 								callScriptOnServer()
 							}
 							post {
@@ -275,7 +274,6 @@ pipeline {
 									}
 									sles12_instance_id = getInstanceId()
 								}
-								suseRegisterCloudGuest()
 								callScriptFromURL()
 							}
 							post {
