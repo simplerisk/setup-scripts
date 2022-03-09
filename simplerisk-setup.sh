@@ -428,7 +428,7 @@ setup_suse(){
 	if [[ "${VER}" = 12* ]]; then
 		print_status "Adding PHP 7.3 repository for SLES 12..."
 		SP_VER="${VER: -1}"
-		exec_cmd "zypper -n addrepo -f https://download.opensuse.org/repositories/devel:/languages:/php:/php73/SLE_12_SP${SP_VER}/devel:languages:php:php73.repo"
+		exec_cmd "yes | zypper -n addrepo -f https://download.opensuse.org/repositories/devel:/languages:/php:/php73/SLE_12_SP${SP_VER}/devel:languages:php:php73.repo"
 		exec_cmd "zypper --gpg-auto-import-keys refresh"
 	fi
 
