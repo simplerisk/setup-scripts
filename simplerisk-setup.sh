@@ -207,7 +207,8 @@ fi
 	fi
 
 	print_status "Setting the SimpleRisk database password..."
-	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
 
 	print_status "Restarting $db to load the new configuration..."
 	exec_cmd "service $(echo \"$db\" | awk '{print tolower($0)}') restart"
@@ -348,7 +349,8 @@ EOF
 	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
 	print_status "Setting the SimpleRisk database password..."
-	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
 	cat << EOF >> /etc/my.cnf
 [mysqld]
 sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
@@ -426,7 +428,7 @@ setup_suse(){
 	if [[ "${VER}" = 12* ]]; then
 		print_status "Adding PHP 7.3 repository for SLES 12..."
 		SP_VER="${VER: -1}"
-		exec_cmd "zypper -n addrepo -f https://download.opensuse.org/repositories/devel:/languages:/php:/php73/SLE_12_SP${SP_VER}/devel:languages:php:php73.repo"
+		exec_cmd "yes | zypper -n addrepo -f https://download.opensuse.org/repositories/devel:/languages:/php:/php73/SLE_12_SP${SP_VER}/devel:languages:php:php73.repo"
 		exec_cmd "zypper --gpg-auto-import-keys refresh"
 	fi
 
@@ -545,7 +547,8 @@ EOF
 	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 	
 	print_status "Setting the SimpleRisk database password..."
-	exec_cmd "sed -i \"s/DB_PASSWORD', 'simplerisk/DB_PASSWORD', '${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
 
 	print_status "Restarting MySQL to load the new configuration..."
 	exec_cmd "systemctl restart mysql"
