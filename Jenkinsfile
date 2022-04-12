@@ -35,10 +35,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${debian_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${debian_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${debian_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${debian_instance_id}", 60) }
 								}
 							}
 						}
@@ -64,10 +64,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${debian_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${debian_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${debian_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${debian_instance_id}") }
 								}
 							}
 						}
@@ -93,10 +93,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${u18_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${u18_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${u18_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${u18_instance_id}", 60) }
 								}
 							}
 						}
@@ -123,10 +123,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${u18_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${u18_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${u18_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${u18_instance_id}") }
 								}
 							}
 						}
@@ -151,10 +151,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${u20_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${u20_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${u20_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${u20_instance_id}", 60) }
 								}
 							}
 						}
@@ -180,10 +180,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${u20_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${u20_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${u20_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${u20_instance_id}") }
 								}
 							}
 						}
@@ -208,10 +208,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${sles12_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${sles12_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${sles12_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${sles12_instance_id}", 60) }
 								}
 							}
 						}
@@ -237,10 +237,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${sles12_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${sles12_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${sles12_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${sles12_instance_id}") }
 								}
 							}
 						}
@@ -265,10 +265,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${sles15_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${sles15_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${sles15_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${sles15_instance_id}", 60) }
 								}
 							}
 						}
@@ -294,10 +294,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${sles15_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${sles15_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${sles15_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${sles15_instance_id}") }
 								}
 							}
 						}
@@ -322,10 +322,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${rhel_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${rhel_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${rhel_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${rhel_instance_id}", 60) }
 								}
 							}
 						}
@@ -351,10 +351,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${rhel_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${rhel_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${rhel_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${rhel_instance_id}") }
 								}
 							}
 						}
@@ -379,10 +379,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${centos_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${centos_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${centos_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${centos_instance_id}", 60) }
 								}
 							}
 						}
@@ -408,10 +408,10 @@ pipeline {
 									}
 								}
 								aborted {
-									script { awsOps.terminateInstance("${centos_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${centos_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${centos_instance_id}", "us-east-1") }
+									script { awsOps.terminateInstance("${centos_instance_id}") }
 								}
 							}
 						}
