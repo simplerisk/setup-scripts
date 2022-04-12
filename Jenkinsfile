@@ -6,7 +6,10 @@ pipeline {
 		stage("Initializing Common Variables") {
 			agent { label "terminator" }
 			steps {
-				script { committer_email = gitOps.getCommitterEmail() }
+				script {
+					committer_email = gitOps.getCommitterEmail()
+					script_commit = (env.CHANGE_ID != null ? pullRequest.head : env.BRANCH_NAME)
+				}
 			}
 			post {
 				failure { 
@@ -49,7 +52,7 @@ pipeline {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/debian10", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									debian_instance_id = awsOps.getEC2Metadata("instance-id")
 								}
-								callScriptFromURL()
+								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -108,7 +111,7 @@ pipeline {
 									u18_instance_id = awsOps.getEC2Metadata("instance-id")
 								}
 								sh "sleep 2m"
-								callScriptFromURL()
+								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -165,7 +168,7 @@ pipeline {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu20", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									u20_instance_id = awsOps.getEC2Metadata("instance-id")
 								}
-								callScriptFromURL()
+								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -222,7 +225,7 @@ pipeline {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/sles12", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									sles12_instance_id = awsOps.getEC2Metadata("instance-id")
 								}
-								callScriptFromURL()
+								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -279,7 +282,7 @@ pipeline {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/sles15", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									sles15_instance_id = awsOps.getEC2Metadata("instance-id")
 								}
-								callScriptFromURL()
+								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -336,7 +339,7 @@ pipeline {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/rhel8", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									rhel_instance_id = awsOps.getEC2Metadata("instance-id")
 								}
-								callScriptFromURL()
+								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -393,7 +396,7 @@ pipeline {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/centos7", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									centos_instance_id = awsOps.getEC2Metadata("instance-id")
 								}
-								callScriptFromURL()
+								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -427,35 +430,14 @@ pipeline {
 	}
 }
 
-
-void callScriptFromURL() {
-	sh "curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/${(env.CHANGE_ID != null ? pullRequest.head : env.BRANCH_NAME)}/simplerisk-setup.sh | sudo bash -s -- -n -d"
+void callScriptFromURL(String commit_ref) {
+	sh "curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/$commit_ref/simplerisk-setup.sh | sudo bash -s -- -n -d"
 	validateStatusCode()
 }
 
 void callScriptOnServer() {
 	sh "sudo ./simplerisk-setup.sh -n -d"
 	validateStatusCode()
-}
-
-void suseRegisterCloudGuest() {
-	sh """
-		sudo rm /etc/SUSEConnect
-		sudo rm -f /etc/zypp/{repos,services,credentials}.d/*
-		sudo rm -f /usr/lib/zypp/plugins/services/*
-		sudo sed -i '/^# Added by SMT reg/,+1d' /etc/hosts
-		sudo /usr/sbin/registercloudguest --force-new
-	"""
-}
-
-void ubuntuReconfiguredpkg() {
-	sh '''
-		sudo rm -f /var/lib/dpkg/lock
-		sudo rm -f /var/lib/dpkg/lock-frontend
-		sudo rm -f /var/apt/lists/lock
-		sudo rm -f /var/cache/apt/archives/lock
-		sudo dpkg --configure -a
-	'''
 }
 
 void validateStatusCode(String urlToCheck="https://localhost") {
