@@ -27,8 +27,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/debian10", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL") }
 									debian_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptOnServer()
 								}
-								callScriptOnServer()
 							}
 							post {
 								failure {
@@ -51,8 +51,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/debian10", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									debian_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptFromURL("$script_commit")
 								}
-								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -84,9 +84,9 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu18", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL") }
 									u18_instance_id = awsOps.getEC2Metadata("instance-id")
+								    sh "sleep 2m"
+								    miscOps.callScriptOnServer()
 								}
-								sh "sleep 2m"
-								callScriptOnServer()
 							}
 							post {
 								failure {
@@ -109,9 +109,9 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu18", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									u18_instance_id = awsOps.getEC2Metadata("instance-id")
+									sh "sleep 2m"
+									miscOps.callScriptFromURL("$script_commit")
 								}
-								sh "sleep 2m"
-								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -143,8 +143,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu20", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL") }
 									u20_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptOnServer()
 								}
-								callScriptOnServer()
 							}
 							post {
 								failure {
@@ -167,8 +167,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu20", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									u20_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptFromURL("$script_commit")
 								}
-								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -200,8 +200,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/sles12", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL") }
 									sles12_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptOnServer()
 								}
-								callScriptOnServer()
 							}
 							post {
 								failure {
@@ -224,8 +224,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/sles12", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									sles12_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptFromURL("$script_commit")
 								}
-								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -257,8 +257,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/sles15", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL") }
 									sles15_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptOnServer()
 								}
-								callScriptOnServer()
 							}
 							post {
 								failure {
@@ -281,8 +281,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/sles15", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									sles15_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptFromURL("$script_commit")
 								}
-								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -314,8 +314,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/rhel8", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL") }
 									rhel_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptOnServer()
 								}
-								callScriptOnServer()
 							}
 							post {
 								failure {
@@ -338,8 +338,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/rhel8", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									rhel_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptFromURL("$script_commit")
 								}
-								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -371,8 +371,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/centos7", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL") }
 									centos_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptOnServer()
 								}
-								callScriptOnServer()
 							}
 							post {
 								failure {
@@ -395,8 +395,8 @@ pipeline {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/centos7", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
 									centos_instance_id = awsOps.getEC2Metadata("instance-id")
+									miscOps.callScriptFromURL("$script_commit")
 								}
-								callScriptFromURL("$script_commit")
 							}
 							post {
 								success {
@@ -428,18 +428,4 @@ pipeline {
 			}
 		}
 	}
-}
-
-void callScriptFromURL(String commit_ref) {
-	sh "curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/$commit_ref/simplerisk-setup.sh | sudo bash -s -- -n -d"
-	validateStatusCode()
-}
-
-void callScriptOnServer() {
-	sh "sudo ./simplerisk-setup.sh -n -d"
-	validateStatusCode()
-}
-
-void validateStatusCode(String urlToCheck="https://localhost") {
-	sh "[ \"\$(curl -s -o /dev/null -w '%{http_code}' -k $urlToCheck)\" = \"200\" ] && exit 0 || exit 1"
 }
