@@ -1,4 +1,4 @@
-@Library('simplerisk@STABLE') _
+@Library('simplerisk') _
 
 pipeline {
 	agent none
