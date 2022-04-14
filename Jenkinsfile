@@ -41,7 +41,7 @@ pipeline {
 									script { awsOps.terminateInstance("${debian_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${debian_instance_id}", 60) }
+									script { awsOps.terminateInstance("${debian_instance_id}", true) }
 								}
 							}
 						}
@@ -99,7 +99,7 @@ pipeline {
 									script { awsOps.terminateInstance("${u18_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${u18_instance_id}", 60) }
+									script { awsOps.terminateInstance("${u18_instance_id}", true) }
 								}
 							}
 						}
@@ -157,7 +157,7 @@ pipeline {
 									script { awsOps.terminateInstance("${u20_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${u20_instance_id}", 60) }
+									script { awsOps.terminateInstance("${u20_instance_id}", true) }
 								}
 							}
 						}
@@ -214,7 +214,7 @@ pipeline {
 									script { awsOps.terminateInstance("${sles12_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${sles12_instance_id}", 60) }
+									script { awsOps.terminateInstance("${sles12_instance_id}", true) }
 								}
 							}
 						}
@@ -271,7 +271,7 @@ pipeline {
 									script { awsOps.terminateInstance("${sles15_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${sles15_instance_id}", 60) }
+									script { awsOps.terminateInstance("${sles15_instance_id}", true) }
 								}
 							}
 						}
@@ -328,7 +328,7 @@ pipeline {
 									script { awsOps.terminateInstance("${rhel_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${rhel_instance_id}", 60) }
+									script { awsOps.terminateInstance("${rhel_instance_id}", true) }
 								}
 							}
 						}
@@ -385,7 +385,7 @@ pipeline {
 									script { awsOps.terminateInstance("${centos_instance_id}") }
 								}
 								cleanup {
-									script { awsOps.terminateInstance("${centos_instance_id}", 60) }
+									script { awsOps.terminateInstance("${centos_instance_id}", true) }
 								}
 							}
 						}
