@@ -572,49 +572,32 @@ detected_os_but_unsupported_version(){
 }
 
 validate_os(){
-	case "$OS" in
+	case "${OS}" in
 		"Ubuntu")
-			if [ "${VER}" = "18.04" ] || [ "${VER}" = "20.04" ]; then
+			if [[ "${VER}" = 18.* ]] || [[ "${VER}" = 19.* ]] || [[ "${VER}" = 20.* ]] || [[ "${VER}" = 21.* ]]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
+			fi
+			detected_os_but_unsupported_version;;
 		"CentOS Linux")
-			if [ "${VER}" = "8" ]; then
+			if [ "${VER}" = "8" ] || [ "${VER}" = "7" ]; then
 				detected_os_proceed && setup_centos_rhel && exit 0
-			elif [ "${VER}" = "7" ]; then
-				detected_os_proceed && setup_centos_rhel && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
+			fi
+			detected_os_but_unsupported_version;;
 		"SLES")
-			if [[ "${VER}" = 15* ]] || [[ "${VER}" = 12* ]]; then
+			if [[ "${VER}" = 12* ]] || [[ "${VER}" = 15* ]]; then
 				detected_os_proceed && setup_suse && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
-		"Red Hat Enterprise Linux")
-			if [[ "${VER}" = 8* ]]; then
+			fi
+			detected_os_but_unsupported_version;;
+		"Red Hat Enterprise Linux"|"Red Hat Enterprise Linux Server")
+			if [[ "${VER}" = 7.9 ]] || [[ "${VER}" = 8* ]]; then
 				detected_os_proceed && setup_centos_rhel && exit 0
-			elif [[ "${VER}" = 7.9 ]]; then
-				detected_os_proceed && setup_centos_rhel && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
-		"Red Hat Enterprise Linux Server")
-                        if [[ "${VER}" = 8* ]]; then
-                                detected_os_proceed && setup_centos_rhel && exit 0
-                        elif [[ "${VER}" = 7.9 ]]; then
-                                detected_os_proceed && setup_centos_rhel && exit 0
-                        else
-                                detected_os_but_unsupported_version
-                        fi;;
+			fi
+			detected_os_but_unsupported_version;;
 		"Debian GNU/Linux")
 			if [ "${VER}" = "10" ]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
+			fi
+			detected_os_but_unsupported_version;;
 		*)
 			echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS. Exiting." && exit 1;;
 	esac
@@ -641,8 +624,8 @@ os_detect(){
 		VER=$(cat /etc/debian_version)
 	elif [ -f /etc/SuSe-release ] || [ -f /etc/redhat-release ]; then
 		# Older SuSE/etc. or Red Hat, CentOS, etc.
-        echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
-        exit 1
+		echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS. Exiting."
+		exit 1
 	else
 		# Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
 		OS=$(uname -s)
