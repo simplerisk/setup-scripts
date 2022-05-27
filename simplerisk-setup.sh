@@ -150,12 +150,8 @@ setup_ubuntu_debian(){
 	exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
-	# FIXME: Might be necessary to check if v21 has PHP 8
-	if [[ "${OS}" = "Ubuntu" ]] && [[ "${VER}" = 22.* ]]; then
-		local php_version="8.*"
-	else
-		local php_version="7.*"
-	fi
+
+	local php_version="$(php -v | grep -E '^PHP [[:digit:]]' | cut -d '.' -f 1 | cut -d ' ' -f 2).*"
 	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php/$php_version/apache2/php.ini"
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
 	
