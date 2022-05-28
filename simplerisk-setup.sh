@@ -71,9 +71,7 @@ set_up_simplerisk() {
 	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
 	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
 	exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
+	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql -O database.sql"
 	exec_cmd "chown -R ${1}: /var/www/simplerisk"
 }
 
@@ -187,7 +185,7 @@ EOF
 	fi
 
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\""
 
 	if [ "${OS}" = "Ubuntu " ] && [ "${VER}" = "18.04" ]; then
 		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
@@ -210,8 +208,8 @@ fi
 	print_status "Restarting $db to load the new configuration..."
 	exec_cmd "service $(echo \"$db\" | awk '{print tolower($0)}') restart"
 
-	print_status "Removing the SimpleRisk install directory..."
-	exec_cmd "rm -r /var/www/simplerisk/install"
+	print_status "Removing the SimpleRisk database file..."
+	exec_cmd "rm -r /var/www/simplerisk/database.sql"
 
 	print_status "Setting up Backup cronjob..."
 	set_up_backup_cronjob
@@ -334,7 +332,7 @@ EOF
 
 	print_status "Configuring MySQL..."
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\""
 	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\""
 	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
@@ -356,8 +354,8 @@ EOF
 	print_status "Restarting MySQL to load the new configuration..."
 	exec_cmd "systemctl restart mariadb"
 
-	print_status "Removing the SimpleRisk install directory..."
-	exec_cmd "rm -r /var/www/simplerisk/install"
+	print_status "Removing the SimpleRisk database file..."
+	exec_cmd "rm -r /var/www/simplerisk/database.sql"
 
 	print_status "Setting up Backup cronjob..."
 	set_up_backup_cronjob
@@ -538,7 +536,7 @@ EOF
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
 	exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\""
 	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\""
 	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
@@ -550,8 +548,8 @@ EOF
 	print_status "Restarting MySQL to load the new configuration..."
 	exec_cmd "systemctl restart mysql"
 
-	print_status "Removing the SimpleRisk install directory..."
-	exec_cmd "rm -r /var/www/simplerisk/install"
+	print_status "Removing the SimpleRisk database file..."
+	exec_cmd "rm -r /var/www/simplerisk/database.sql"
 
 	print_status "Setting up Backup cronjob..."
 	set_up_backup_cronjob
