@@ -5,7 +5,7 @@
 # SIMPLERISK SETUP SCRIPT
 # Currently works for:
 # - Debian 10
-# - Ubuntu 18.04, 20.04
+# - Ubuntu 18.04, 20.04, 21.10 and 22.04
 # - CentOS 7, 8
 # - Red Hat Enterprise Linux (RHEL) 7.9, 8
 # - SUSE Linux Enterprise Server (SLES) 12, 15
@@ -71,9 +71,7 @@ set_up_simplerisk() {
 	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
 	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
 	exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/installer/raw/master/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && tar xvzf simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm -f /var/www/simplerisk/simplerisk-installer-${CURRENT_SIMPLERISK_VERSION}.tgz"
+	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql -O database.sql"
 	exec_cmd "chown -R ${1}: /var/www/simplerisk"
 }
 
@@ -150,11 +148,8 @@ setup_ubuntu_debian(){
 	exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
-	if [ "${OS}" = "Ubuntu" ]; then
-		[ "${VER}" = "20.04" ] && local php_version="7.4" || local php_version="7.2"
-	else
-		local php_version="7.3"
-	fi
+
+	local php_version="$(php -v | grep -E '^PHP [[:digit:]]' | cut -d '.' -f 1 | cut -d ' ' -f 2).*"
 	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php/$php_version/apache2/php.ini"
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
 	
@@ -190,7 +185,7 @@ EOF
 	fi
 
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\""
 
 	if [ "${OS}" = "Ubuntu " ] && [ "${VER}" = "18.04" ]; then
 		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
@@ -213,8 +208,8 @@ fi
 	print_status "Restarting $db to load the new configuration..."
 	exec_cmd "service $(echo \"$db\" | awk '{print tolower($0)}') restart"
 
-	print_status "Removing the SimpleRisk install directory..."
-	exec_cmd "rm -r /var/www/simplerisk/install"
+	print_status "Removing the SimpleRisk database file..."
+	exec_cmd "rm -r /var/www/simplerisk/database.sql"
 
 	print_status "Setting up Backup cronjob..."
 	set_up_backup_cronjob
@@ -337,7 +332,7 @@ EOF
 
 	print_status "Configuring MySQL..."
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\""
 	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\""
 	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
@@ -359,8 +354,8 @@ EOF
 	print_status "Restarting MySQL to load the new configuration..."
 	exec_cmd "systemctl restart mariadb"
 
-	print_status "Removing the SimpleRisk install directory..."
-	exec_cmd "rm -r /var/www/simplerisk/install"
+	print_status "Removing the SimpleRisk database file..."
+	exec_cmd "rm -r /var/www/simplerisk/database.sql"
 
 	print_status "Setting up Backup cronjob..."
 	set_up_backup_cronjob
@@ -541,7 +536,7 @@ EOF
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
 	exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/install/db/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\""
 	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\""
 	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
@@ -553,8 +548,8 @@ EOF
 	print_status "Restarting MySQL to load the new configuration..."
 	exec_cmd "systemctl restart mysql"
 
-	print_status "Removing the SimpleRisk install directory..."
-	exec_cmd "rm -r /var/www/simplerisk/install"
+	print_status "Removing the SimpleRisk database file..."
+	exec_cmd "rm -r /var/www/simplerisk/database.sql"
 
 	print_status "Setting up Backup cronjob..."
 	set_up_backup_cronjob
@@ -572,49 +567,32 @@ detected_os_but_unsupported_version(){
 }
 
 validate_os(){
-	case "$OS" in
+	case "${OS}" in
 		"Ubuntu")
-			if [ "${VER}" = "18.04" ] || [ "${VER}" = "20.04" ]; then
+			if [[ "${VER}" = 18.* ]] || [[ "${VER}" = 20.* ]] || [[ "${VER}" = "21.10" ]] || [[ "${VER}" = 22.* ]]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
+			fi
+			detected_os_but_unsupported_version;;
 		"CentOS Linux")
-			if [ "${VER}" = "8" ]; then
+			if [ "${VER}" = "8" ] || [ "${VER}" = "7" ]; then
 				detected_os_proceed && setup_centos_rhel && exit 0
-			elif [ "${VER}" = "7" ]; then
-				detected_os_proceed && setup_centos_rhel && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
+			fi
+			detected_os_but_unsupported_version;;
 		"SLES")
-			if [[ "${VER}" = 15* ]] || [[ "${VER}" = 12* ]]; then
+			if [[ "${VER}" = 12* ]] || [[ "${VER}" = 15* ]]; then
 				detected_os_proceed && setup_suse && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
-		"Red Hat Enterprise Linux")
-			if [[ "${VER}" = 8* ]]; then
+			fi
+			detected_os_but_unsupported_version;;
+		"Red Hat Enterprise Linux"|"Red Hat Enterprise Linux Server")
+			if [[ "${VER}" = 7.9 ]] || [[ "${VER}" = 8* ]]; then
 				detected_os_proceed && setup_centos_rhel && exit 0
-			elif [[ "${VER}" = 7.9 ]]; then
-				detected_os_proceed && setup_centos_rhel && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
-		"Red Hat Enterprise Linux Server")
-                        if [[ "${VER}" = 8* ]]; then
-                                detected_os_proceed && setup_centos_rhel && exit 0
-                        elif [[ "${VER}" = 7.9 ]]; then
-                                detected_os_proceed && setup_centos_rhel && exit 0
-                        else
-                                detected_os_but_unsupported_version
-                        fi;;
+			fi
+			detected_os_but_unsupported_version;;
 		"Debian GNU/Linux")
 			if [ "${VER}" = "10" ]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
-			else
-				detected_os_but_unsupported_version
-			fi;;
+			fi
+			detected_os_but_unsupported_version;;
 		*)
 			echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS. Exiting." && exit 1;;
 	esac
@@ -641,8 +619,8 @@ os_detect(){
 		VER=$(cat /etc/debian_version)
 	elif [ -f /etc/SuSe-release ] || [ -f /etc/redhat-release ]; then
 		# Older SuSE/etc. or Red Hat, CentOS, etc.
-        echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS.  Exiting."
-        exit 1
+		echo "The SimpleRisk setup script cannot reliably determine which commands to run for this OS. Exiting."
+		exit 1
 	else
 		# Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
 		OS=$(uname -s)
