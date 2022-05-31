@@ -202,7 +202,7 @@ pipeline {
 							steps {
 								script {
 									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/ubuntu18", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
-									u18_instance_id = awsOps.getEC2Metadata("instance-id")
+									u22_instance_id = awsOps.getEC2Metadata("instance-id")
 									sh "sleep 2m"
 									miscOps.callScriptFromURL("$script_commit")
 								}
