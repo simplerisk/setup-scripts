@@ -642,8 +642,7 @@ os_detect(){
 }
 
 ask_user(){
-	# shellcheck disable=2162
-	read -p "This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
+	read -r -p "This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
 	case "${answer}" in
 		Yes|yes|Y|y ) os_detect;;
 		* ) exit 1;;
