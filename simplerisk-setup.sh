@@ -598,7 +598,7 @@ validate_os(){
 			fi
 			detected_os_but_unsupported_version;;
 		"Debian GNU/Linux")
-			if [ "${VER}" = "10" ]; then
+			if [ "${VER}" = "10" ] || [ "${VER}" = "11" ]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
 			fi
 			detected_os_but_unsupported_version;;
