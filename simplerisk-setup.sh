@@ -120,9 +120,6 @@ setup_ubuntu_debian(){
 	print_status "Installing PHP development libraries..."
 	exec_cmd "apt-get install -y php-dev"
 
-	print_status "Installing pear for PHP..."
-	exec_cmd "apt-get install -y php-pear"
-
 	print_status "Installing ldap module for PHP..."
 	exec_cmd "apt-get install -y php-ldap"
 
@@ -259,15 +256,15 @@ setup_centos_rhel(){
 			exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-process"
 		else
 			exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-                	exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
-                	exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-                	exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
+			exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
+			exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
+			exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
 		fi
 	else
 		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 		exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
 		exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
+		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
 	fi
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
