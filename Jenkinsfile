@@ -19,57 +19,6 @@ pipeline {
 		}
 		stage("Setup Script Deployment") {
 			parallel {
-				stage("Debian 10") {
-					stages {
-						stage("Script On Server") {
-							agent { label "debian10" }
-							steps {
-								script {
-									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/debian10", description: "Installing SimpleRisk through script on server...", targetUrl: "$BUILD_URL") }
-									d10_instance_id = awsOps.getEC2Metadata("instance-id")
-									miscOps.callScriptOnServer()
-								}
-							}
-							post {
-								failure {
-									script {
-										if (env.CHANGE_ID) { pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL") }
-										emailOps.sendErrorEmail("debian_10/${env.STAGE_NAME}", "${committer_email}")
-									}
-								}
-								cleanup {
-									script { awsOps.terminateInstance("${d10_instance_id}", true) }
-								}
-							}
-						}
-						stage("Through Web URL") {
-							agent { label "debian10" }
-							steps {
-								script {
-									if (env.CHANGE_ID) { pullRequest.createStatus(status: "pending", context: "setup-scripts/debian10", description: "Installing SimpleRisk through URL...", targetUrl: "$BUILD_URL") }
-									d10_instance_id = awsOps.getEC2Metadata("instance-id")
-									miscOps.callScriptFromURL("$script_commit")
-								}
-							}
-							post {
-								success {
-									script {
-										if (env.CHANGE_ID) { pullRequest.createStatus(status: "success", context: "setup-scripts/debian10", description: "SimpleRisk installed successfully.", targetUrl: "$BUILD_URL") }
-									}
-								}
-								failure {
-									script {
-										if (env.CHANGE_ID) { pullRequest.createStatus(status: "failure", context: "setup-scripts/debian10", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL") }
-										emailOps.sendErrorEmail("debian_10/${env.STAGE_NAME}", "${committer_email}")
-									}
-								}
-								cleanup {
-									script { awsOps.terminateInstance("${d10_instance_id}") }
-								}
-							}
-						}
-					}
-				}
 				stage("Debian 11") {
 					stages {
 						stage("Script On Server") {
@@ -85,7 +34,7 @@ pipeline {
 								failure {
 									script {
 										if (env.CHANGE_ID) { pullRequest.createStatus(status: "failure", context: "setup-scripts/debian11", description: "Couldn't install SimpleRisk through script on server.", targetUrl: "$BUILD_URL") }
-										emailOps.sendErrorEmail("debian_10/${env.STAGE_NAME}", "${committer_email}")
+										emailOps.sendErrorEmail("debian_11/${env.STAGE_NAME}", "${committer_email}")
 									}
 								}
 								cleanup {
@@ -111,7 +60,7 @@ pipeline {
 								failure {
 									script {
 										if (env.CHANGE_ID) { pullRequest.createStatus(status: "failure", context: "setup-scripts/debian11", description: "Couldn't install SimpleRisk through URL.", targetUrl: "$BUILD_URL") }
-										emailOps.sendErrorEmail("debian_10/${env.STAGE_NAME}", "${committer_email}")
+										emailOps.sendErrorEmail("debian_11/${env.STAGE_NAME}", "${committer_email}")
 									}
 								}
 								cleanup {
