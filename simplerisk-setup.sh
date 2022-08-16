@@ -4,8 +4,8 @@
 ###########################################
 # SIMPLERISK SETUP SCRIPT
 # Currently works for:
-# - Debian 10
-# - Ubuntu 18.04, 20.04, 21.10 and 22.04
+# - Debian 11
+# - Ubuntu 18.04, 20.04, and 22.04
 # - CentOS 7, 8
 # - Red Hat Enterprise Linux (RHEL) 7.9, 8
 # - SUSE Linux Enterprise Server (SLES) 12, 15
@@ -575,7 +575,7 @@ detected_os_but_unsupported_version(){
 validate_os(){
 	case "${OS}" in
 		"Ubuntu")
-			if [[ "${VER}" = 18.* ]] || [[ "${VER}" = 20.* ]] || [[ "${VER}" = "21.10" ]] || [[ "${VER}" = 22.* ]]; then
+			if [[ "${VER}" = "18.04" ]] || [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
 			fi
 			detected_os_but_unsupported_version;;
@@ -595,7 +595,7 @@ validate_os(){
 			fi
 			detected_os_but_unsupported_version;;
 		"Debian GNU/Linux")
-			if [ "${VER}" = "10" ] || [ "${VER}" = "11" ]; then
+			if [ "${VER}" = "11" ]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
 			fi
 			detected_os_but_unsupported_version;;
