@@ -4,8 +4,8 @@
 ###########################################
 # SIMPLERISK SETUP SCRIPT
 # Currently works for:
-# - Debian 10
-# - Ubuntu 18.04, 20.04, 21.10 and 22.04
+# - Debian 11
+# - Ubuntu 18.04, 20.04, and 22.04
 # - CentOS 7, 8
 # - Red Hat Enterprise Linux (RHEL) 7.9, 8
 # - SUSE Linux Enterprise Server (SLES) 12, 15
@@ -49,6 +49,7 @@ check_root() {
 }
 
 create_random_password() {
+	# shellcheck disable=SC2005
 	echo "$(< /dev/urandom tr -dc A-Za-z0-9 | head -c20)"
 }
 
@@ -84,6 +85,7 @@ get_simplerisk_version() {
         CURRENT_SIMPLERISK_VERSION=$(curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1)
 }
 
+# shellcheck disable=SC2120
 setup_ubuntu_debian(){
 	get_simplerisk_version
 
@@ -118,9 +120,6 @@ setup_ubuntu_debian(){
 	print_status "Installing PHP development libraries..."
 	exec_cmd "apt-get install -y php-dev"
 
-	print_status "Installing pear for PHP..."
-	exec_cmd "apt-get install -y php-pear"
-
 	print_status "Installing ldap module for PHP..."
 	exec_cmd "apt-get install -y php-ldap"
 
@@ -149,7 +148,8 @@ setup_ubuntu_debian(){
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
 
-	local php_version="$(php -v | grep -E '^PHP [[:digit:]]' | cut -d '.' -f 1 | cut -d ' ' -f 2).*"
+	local php_version
+	php_version="$(php -v | grep -E '^PHP [[:digit:]]' | cut -d '.' -f 1 | cut -d ' ' -f 2).*"
 	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php/$php_version/apache2/php.ini"
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
 	
@@ -160,11 +160,13 @@ setup_ubuntu_debian(){
 
 	print_status "Configuring Apache..."
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
-	if [ ! `grep -q "RewriteEngine On" /etc/apache2/sites-enabled/000-default.conf` ]; then
+	# shellcheck disable=SC2143
+	if [ ! "$(grep -q "RewriteEngine On" /etc/apache2/sites-enabled/000-default.conf)" ]; then
 		exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf"
 	fi
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf"
-	if [ ! `grep -q "AllowOverride all" /etc/apache2/sites-enabled/default-ssl.conf` ]; then
+	# shellcheck disable=SC2143
+	if [ ! "$(grep -q "AllowOverride all" /etc/apache2/sites-enabled/default-ssl.conf)" ]; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf"
 	fi
 
@@ -173,7 +175,8 @@ setup_ubuntu_debian(){
 
 	generate_passwords
 
-	[ "${OS}" = "Ubuntu" ] && local db="MySQL" || local db="MariaDB"
+	local db
+	[ "${OS}" = "Ubuntu" ] && db="MySQL" || db="MariaDB"
 	print_status "Configuring $db..."
 	if [ "${db}" = "MariaDB" ]; then
 		cat << EOF >> /etc/mysql/my.cnf
@@ -229,6 +232,7 @@ fi
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
+# shellcheck disable=SC2120
 setup_centos_rhel(){
 	get_simplerisk_version
 
@@ -252,15 +256,15 @@ setup_centos_rhel(){
 			exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-process"
 		else
 			exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-                	exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
-                	exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-                	exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
+			exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
+			exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
+			exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
 		fi
 	else
 		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 		exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
 		exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pear php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
+		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json"
 	fi
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
@@ -318,11 +322,12 @@ setup_centos_rhel(){
 </VirtualHost>
 EOF
 
-	if [ ! `grep -q "AllowOverride all" /etc/httpd/conf.d/ssl.conf` ]; then
+	# shellcheck disable=SC2143
+	if [ ! "$(grep -q "AllowOverride all" /etc/httpd/conf.d/ssl.conf)" ]; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
 	fi
 	if [ "${OS}" = "CentOS Linux" ]; then
-		exec_cmd "sed -i '/<VirtualHost _default_:443>/a \\\t\tDocumentRoot "/var/www/simplerisk"' /etc/httpd/conf.d/ssl.conf"
+		exec_cmd "sed -i '/<VirtualHost _default_:443>/a \\\t\tDocumentRoot \"/var/www/simplerisk\"' /etc/httpd/conf.d/ssl.conf"
 	else
 		exec_cmd "sed -i 's/#\(LoadModule mpm_prefork\)/\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
 		exec_cmd "sed -i 's/\(LoadModule mpm_event\)/#\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
@@ -412,6 +417,7 @@ EOF
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
+# shellcheck disable=SC2120
 setup_suse(){
 	get_simplerisk_version
 
@@ -569,7 +575,7 @@ detected_os_but_unsupported_version(){
 validate_os(){
 	case "${OS}" in
 		"Ubuntu")
-			if [[ "${VER}" = 18.* ]] || [[ "${VER}" = 20.* ]] || [[ "${VER}" = "21.10" ]] || [[ "${VER}" = 22.* ]]; then
+			if [[ "${VER}" = "18.04" ]] || [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
 			fi
 			detected_os_but_unsupported_version;;
@@ -589,7 +595,7 @@ validate_os(){
 			fi
 			detected_os_but_unsupported_version;;
 		"Debian GNU/Linux")
-			if [ "${VER}" = "10" ]; then
+			if [ "${VER}" = "11" ]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
 			fi
 			detected_os_but_unsupported_version;;
@@ -601,6 +607,7 @@ validate_os(){
 os_detect(){
 	if [ -f /etc/os-release ]; then
 		# freedesktop.org and systemd
+		# shellcheck source=/dev/null
 		. /etc/os-release
 		OS=$NAME
 		VER=$VERSION_ID
@@ -610,6 +617,7 @@ os_detect(){
 		VER=$(lsb_release -sr)
 	elif [ -f /etc/lsb-release ]; then
 		# For some versions of Debian/Ubuntu without lsb_release command
+		# shellcheck source=/dev/null
 		. /etc/lsb-release
 		OS=$DISTRIB_ID
 		VER=$DISTRIB_RELEASE
@@ -631,7 +639,7 @@ os_detect(){
 }
 
 ask_user(){
-	read -p "This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
+	read -r -p "This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: " answer < /dev/tty
 	case "${answer}" in
 		Yes|yes|Y|y ) os_detect;;
 		* ) exit 1;;
