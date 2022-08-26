@@ -176,6 +176,7 @@ setup_ubuntu_debian(){
 	print_status "Configuring Sendmail..."
 	exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
 	exec_cmd "yes | sendmailconfig"
+	exec_cmd "service sendmail start"
 
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "service apache2 restart"
@@ -379,7 +380,8 @@ EOF
 	exec_cmd "systemctl enable httpd"
 	exec_cmd "systemctl start httpd"
 
-	print_status "Starting Sendmail..."
+	print_status "Configuring and starting Sendmail..."
+	exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
 	exec_cmd "systemctl start sendmail"
 
 	print_status "Opening Firewall for HTTP/HTTPS traffic"
@@ -468,6 +470,12 @@ setup_suse(){
 	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring php-posix php-gd php-zip"
 	exec_cmd "a2enmod php7"
 
+	print_status "Removing Postfix and Installing Sendmail... (only applies to SLES 12)"
+	if [[ "${VER}" = 12* ]]; then
+		exec_cmd "zypper -n remove postfix"
+		exec_cmd "zypper -n install sendmail"
+	fi
+
 	print_status "Enabling SSL for Apache..."
 	exec_cmd "a2enmod rewrite"
 	exec_cmd "a2enmod ssl"
@@ -543,6 +551,13 @@ EOF
 
 	set_up_simplerisk "wwwrun"
 
+	print_status "Configuring and starting Sendmail... (only applies to SLES 12)"
+	if [[ "${VER}" = 12* ]]; then
+		exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+		exec_cmd "chown -R mail:mail /var/spool/clientmqueue/"
+		exec_cmd "systemctl start sendmail"
+	fi
+
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "systemctl restart apache2"
 
@@ -574,6 +589,9 @@ EOF
 	set_up_backup_cronjob
 
 	print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
+	if [[ "${VER}" = 15* ]]; then
+		print_status "NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails."
+	fi
 	print_status "INSTALLATION COMPLETED SUCCESSFULLY"
 }
 
@@ -598,8 +616,21 @@ validate_os(){
 			fi
 			detected_os_but_unsupported_version;;
 		"SLES")
-			if [[ "${VER}" = 12* ]] || [[ "${VER}" = 15* ]]; then
+			if [[ "${VER}" = 12* ]]; then
 				detected_os_proceed && setup_suse && exit 0
+			fi
+			if [[ "${VER}" = 15* ]]; then
+				detected_os_proceed
+				if [ -z "${HEADLESS:-}" ]; then
+					read -r -p "Before continuing, SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails. Do you still want to proceed? [ Yes / No ]: " answer < /dev/tty
+					case "${answer}" in
+						Yes|yes|Y|y ) setup_suse && exit 0;;
+						* ) exit 1;;
+					esac
+				else
+					setup_suse && exit 0;
+				fi
+				
 			fi
 			detected_os_but_unsupported_version;;
 		"Red Hat Enterprise Linux"|"Red Hat Enterprise Linux Server")
