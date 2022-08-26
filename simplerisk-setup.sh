@@ -140,6 +140,9 @@ setup_ubuntu_debian(){
 	exec_cmd "a2enmod ssl"
 	exec_cmd "a2ensite default-ssl"
 
+	print_status "Installing sendmail..."
+	exec_cmd "apt-get install -y sendmail"
+
 	print_status "Configuring secure settings for Apache..."
 	exec_cmd "sed -i 's/SSLProtocol all -SSLv3/SSLProtocol TLSv1.2/g' /etc/apache2/mods-enabled/ssl.conf"
 	exec_cmd "sed -i 's/#SSLHonorCipherOrder on/SSLHonorCipherOrder on/g' /etc/apache2/mods-enabled/ssl.conf"
@@ -169,6 +172,10 @@ setup_ubuntu_debian(){
 	if [ ! "$(grep -q "AllowOverride all" /etc/apache2/sites-enabled/default-ssl.conf)" ]; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf"
 	fi
+
+	print_status "Configuring Sendmail..."
+	exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+	exec_cmd "yes | sendmailconfig"
 
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "service apache2 restart"
