@@ -303,6 +303,9 @@ setup_centos_rhel(){
 	print_status "Installing mod_ssl"
 	exec_cmd "yum -y install mod_ssl"
 
+	print_status "Installing sendmail"
+	exec_cmd "yum -y install sendmail sendmail-cf m4"
+
 	set_up_simplerisk "apache"
 
 	print_status "Configuring Apache..."
@@ -375,6 +378,9 @@ EOF
 	print_status "Enabling and starting the Apache web server..."
 	exec_cmd "systemctl enable httpd"
 	exec_cmd "systemctl start httpd"
+
+	print_status "Starting Sendmail..."
+	exec_cmd "systemctl start sendmail"
 
 	print_status "Opening Firewall for HTTP/HTTPS traffic"
 	exec_cmd "systemctl enable firewalld"
