@@ -135,6 +135,9 @@ setup_ubuntu_debian(){
 	print_status "Installing the zip module for PHP..."
 	exec_cmd "apt-get install -y php-zip"
 
+	print_status "Installing postfix..."
+	exec_cmd "export DEBIAN_FRONTEND=noninteractive && apt-get install -y postfix mailutils"
+
 	print_status "Enabling SSL for Apache..."
 	exec_cmd "a2enmod rewrite"
 	exec_cmd "a2enmod ssl"
@@ -169,6 +172,13 @@ setup_ubuntu_debian(){
 	if [ ! "$(grep -q "AllowOverride all" /etc/apache2/sites-enabled/default-ssl.conf)" ]; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf"
 	fi
+
+	print_status "Configuring postfix..."
+	exec_cmd "cp /usr/share/postfix/main.cf.debian /etc/postfix/main.cf"
+	if [ ! -e "/var/spool/postfix/public/pickup" ]; then
+		exec_cmd "mkfifo /var/spool/postfix/public/pickup"
+	fi
+	exec_cmd "service postfix restart"
 
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "service apache2 restart"
@@ -226,6 +236,7 @@ fi
 	exec_cmd "ufw allow ssh"
 	exec_cmd "ufw allow http"
 	exec_cmd "ufw allow https"
+	exec_cmd "ufw allow postfix"
 	exec_cmd "ufw --force enable"
 
 	print_status "Check /root/passwords.txt for the MySQL root and simplerisk passwords."
