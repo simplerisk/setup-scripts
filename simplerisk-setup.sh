@@ -475,6 +475,9 @@ setup_suse(){
 	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring php-posix php-gd php-zip"
 	exec_cmd "a2enmod php7"
 
+	print_status "Installing Postfix..."
+	exec_cmd "zypper -n install postfix mailx"
+
 	print_status "Enabling SSL for Apache..."
 	exec_cmd "a2enmod rewrite"
 	exec_cmd "a2enmod ssl"
@@ -549,6 +552,12 @@ EOF
 	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php7/apache2/php.ini"
 
 	set_up_simplerisk "wwwrun"
+
+	print_status "Configuring Postfix..."
+	if [ ! -e "/var/spool/postfix/public/pickup" ]; then
+		exec_cmd "mkfifo /var/spool/postfix/public/pickup"
+	fi
+	exec_cmd "systemctl restart postfix"
 
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "systemctl restart apache2"
