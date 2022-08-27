@@ -300,6 +300,9 @@ setup_centos_rhel(){
 		fi
 	fi
 
+	print_status "Installing postfix..."
+	exec_cmd "yum -y install postfix mailx"
+
 	print_status "Enabling and starting the MariaDB database server..."
 	exec_cmd "systemctl enable mariadb"
 	exec_cmd "systemctl start mariadb"
@@ -375,6 +378,12 @@ EOF
 
 	print_status "Setting up Backup cronjob..."
 	set_up_backup_cronjob
+
+	print_status "Configuring postfix"
+	if [ ! -e "/var/spool/postfix/public/pickup" ]; then
+		exec_cmd "mkfifo /var/spool/postfix/public/pickup"
+	fi
+	exec_cmd "systemctl restart postfix"
 
 	print_status "Enabling and starting the Apache web server..."
 	exec_cmd "systemctl enable httpd"
