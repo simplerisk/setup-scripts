@@ -91,49 +91,81 @@ setup_ubuntu_debian(){
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
+	# Add PHP8 for Ubuntu 18/20|Debian 11
+	if [[ "$OS" = "Ubuntu" ]] && [[ "$VER" =~ (18|20).04 ]]; then
+		local apt_php_version
+		apt_php_version=8.1
+		print_status "Adding Ondrej's PPA with PHP8"
+		exec_cmd 'add-apt-repository -y ppa:ondrej/php'
+	fi
+
+	# Add MySQL 8 for Ubuntu 18
+	if [[ "$OS" = "Ubuntu" ]] && [[ "$VER" == "18.04" ]]; then
+		print_status "Adding MySQL 8 repository"
+		exec_cmd 'apt-key adv --keyserver pgp.mit.edu --recv-keys 3A79BD29'
+		exec_cmd 'echo "deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-8.0" | sudo tee /etc/apt/sources.list.d/mysql.list'
+	fi
+
+	if [[ "$OS" = "Debian" ]]; then
+		local apt_php_version
+		apt_php_version=8.1
+		print_status "Populating apt-get cache..."
+		exec_cmd 'apt-get update'
+		exec_cmd 'apt install gnupg'
+
+		print_status "Adding Ondrej's repository with PHP8"
+		exec_cmd 'echo "deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/sury-php.list > /dev/null'
+		exec_cmd 'mkdir -p /etc/apt/keyrings'
+		exec_cmd 'wget -qO - https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /etc/apt/keyrings/sury-php.gpg'
+
+		print_status "Adding MySQL 8 repository"
+		exec_cmd 'wget -qO - http://repo.mysql.com/RPM-GPG-KEY-mysql-2022 | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg'
+		exec_cmd 'echo "deb [signed-by=/etc/apt/keyrings/mysql.gpg] http://repo.mysql.com/apt/debian bullseye mysql-8.0" | sudo tee /etc/apt/sources.list.d/mysql.list > /dev/null'
+	fi
+
 	print_status "Populating apt-get cache..."
 	exec_cmd 'apt-get update'
 
 	print_status "Updating current packages (this may take a bit)..."
 	exec_cmd "apt-get dist-upgrade -qq --assume-yes"
 
-	if [ "${OS}" = "Ubuntu" ]; then
+	if [ "${OS}" = "Ubuntu" ] && [[ "${VER}" =~ 22* ]]; then
 		print_status "Installing lamp-server..."
 		exec_cmd "apt-get install -y lamp-server^"
 	else
 		print_status "Installing Apache..."
 		exec_cmd "apt-get install -y apache2"
 
-		print_status "Installing MariaDB..."
-		exec_cmd "apt-get install -y mariadb-server"
+		print_status "Installing MySQL..."
+		exec_cmd "apt-get install -y mysql-server"
 
 		print_status "Installing PHP..."
-		exec_cmd "apt-get install -y php php-mysql libapache2-mod-php"
+		exec_cmd "apt-get install -y php${apt_php_version:-} php${apt_php_version:-}-mysql libapache2-mod-php${apt_php_version:-}"
 	fi
 
 	print_status "Installing mbstring module for PHP..."
-	exec_cmd "apt-get install -y php-mbstring"
+	exec_cmd "apt-get install -y php${apt_php_version:-}-mbstring"
 
 	print_status "Installing PHP development libraries..."
-	exec_cmd "apt-get install -y php-dev"
+	exec_cmd "apt-get install -y php${apt_php_version:-}-dev"
 
 	print_status "Installing ldap module for PHP..."
-	exec_cmd "apt-get install -y php-ldap"
+	exec_cmd "apt-get install -y php${apt_php_version:-}-ldap"
 
 	print_status "Enabling the ldap module in PHP..."
 	exec_cmd "phpenmod ldap"
 
 	print_status "Installing curl module for PHP..."
-	exec_cmd "apt-get install -y php-curl"
+	exec_cmd "apt-get install -y php${apt_php_version:-}-curl"
 
 	print_status "Installing the gd module for PHP..."
-	exec_cmd "apt-get install -y php-gd"
+	exec_cmd "apt-get install -y php${apt_php_version:-}-gd"
 
 	print_status "Installing the zip module for PHP..."
-	exec_cmd "apt-get install -y php-zip"
+	exec_cmd "apt-get install -y php${apt_php_version:-}-zip"
 
 	print_status "Installing the intl module for PHP..."
-	exec_cmd "apt-get install -y php-intl"
+	exec_cmd "apt-get install -y php${apt_php_version:-}-intl"
 
 	print_status "Enabling SSL for Apache..."
 	exec_cmd "a2enmod rewrite"
@@ -183,41 +215,25 @@ setup_ubuntu_debian(){
 
 	generate_passwords
 
-	local db
-	[ "${OS}" = "Ubuntu" ] && db="MySQL" || db="MariaDB"
-	print_status "Configuring $db..."
-	if [ "${db}" = "MariaDB" ]; then
-		cat << EOF >> /etc/mysql/my.cnf
-[mysqld]
-sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
-EOF
-	else
-		exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
-	fi
+	print_status "Configuring MySQL..."
+	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
 
 	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
 	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\""
 
-	if [ "${OS}" = "Ubuntu " ] && [ "${VER}" = "18.04" ]; then
-		exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
-	else
 	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost'\""
-fi
 
 	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
-	if [ "${OS}" = "Ubuntu" ]; then
-		exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
-	else
-		exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
-	fi
+
+	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
 
-	print_status "Restarting $db to load the new configuration..."
-	exec_cmd "service $(echo \"$db\" | awk '{print tolower($0)}') restart"
+	print_status "Restarting MySQL to load the new configuration..."
+	exec_cmd "service mysql restart"
 
 	print_status "Removing the SimpleRisk database file..."
 	exec_cmd "rm -r /var/www/simplerisk/database.sql"
