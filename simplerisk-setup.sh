@@ -4,10 +4,10 @@
 ###########################################
 # SIMPLERISK SETUP SCRIPT
 # Currently works for:
+# - Ubuntu 18.04, 20.04, 22.04 and 22.10
 # - Debian 11
-# - Ubuntu 18.04, 20.04, and 22.04
-# - CentOS 7, 8
-# - Red Hat Enterprise Linux (RHEL) 7.9, 8
+# - CentOS 7
+# - Red Hat Enterprise Linux (RHEL) 8, 9
 # - SUSE Linux Enterprise Server (SLES) 12, 15
 #
 # Run as root or insert `sudo -E` before `bash`: 
@@ -609,12 +609,22 @@ detected_os_but_unsupported_version(){
 validate_os(){
 	case "${OS}" in
 		"Ubuntu")
-			if [[ "${VER}" = "18.04" ]] || [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]]; then
+			if [[ "${VER}" = "18.04" ]] || [[ "${VER}" = "20.04" ]] || [[ "${VER}" =~ 22.* ]]; then
+				detected_os_proceed && setup_ubuntu_debian && exit 0
+			fi
+			detected_os_but_unsupported_version;;
+		"Debian GNU/Linux")
+			if [ "${VER}" = "11" ]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
 			fi
 			detected_os_but_unsupported_version;;
 		"CentOS Linux")
-			if [ "${VER}" = "8" ] || [ "${VER}" = "7" ]; then
+			if [ "${VER}" = "7" ]; then
+				detected_os_proceed && setup_centos_rhel && exit 0
+			fi
+			detected_os_but_unsupported_version;;
+		"Red Hat Enterprise Linux"|"Red Hat Enterprise Linux Server")
+			if [[ "${VER}" =~ 8* ]] || [[ "${VER}" =~ 9* ]]; then
 				detected_os_proceed && setup_centos_rhel && exit 0
 			fi
 			detected_os_but_unsupported_version;;
@@ -634,16 +644,6 @@ validate_os(){
 					setup_suse && exit 0;
 				fi
 				
-			fi
-			detected_os_but_unsupported_version;;
-		"Red Hat Enterprise Linux"|"Red Hat Enterprise Linux Server")
-			if [[ "${VER}" = 7.9 ]] || [[ "${VER}" = 8* ]]; then
-				detected_os_proceed && setup_centos_rhel && exit 0
-			fi
-			detected_os_but_unsupported_version;;
-		"Debian GNU/Linux")
-			if [ "${VER}" = "11" ]; then
-				detected_os_proceed && setup_ubuntu_debian && exit 0
 			fi
 			detected_os_but_unsupported_version;;
 		*)
