@@ -92,7 +92,7 @@ setup_ubuntu_debian(){
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
 	# Add PHP8 for Ubuntu 18/20|Debian 11
-	if [[ "$OS" = "Ubuntu" ]] && [[ "$VER" =~ (18|20).04 ]]; then
+	if [ "${OS}" = "Ubuntu" ] && [[ "${VER}" =~ (18|20).04 ]]; then
 		local apt_php_version
 		apt_php_version=8.1
 		print_status "Adding Ondrej's PPA with PHP8"
@@ -129,7 +129,7 @@ setup_ubuntu_debian(){
 	print_status "Updating current packages (this may take a bit)..."
 	exec_cmd "apt-get dist-upgrade -qq --assume-yes"
 
-	if [ "${OS}" = "Ubuntu" ] && [[ "${VER}" =~ 22* ]]; then
+	if [ "${OS}" = "Ubuntu" ] && [[ "${VER}" = 22* ]]; then
 		print_status "Installing lamp-server..."
 		exec_cmd "apt-get install -y lamp-server^"
 	else
@@ -622,7 +622,7 @@ detected_os_but_unsupported_version(){
 validate_os(){
 	case "${OS}" in
 		"Ubuntu")
-			if [[ "${VER}" = "18.04" ]] || [[ "${VER}" = "20.04" ]] || [[ "${VER}" =~ 22.* ]]; then
+			if [[ "${VER}" = "18.04" ]] || [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]]; then
 				detected_os_proceed && setup_ubuntu_debian && exit 0
 			fi
 			detected_os_but_unsupported_version;;
@@ -637,7 +637,7 @@ validate_os(){
 			fi
 			detected_os_but_unsupported_version;;
 		"Red Hat Enterprise Linux"|"Red Hat Enterprise Linux Server")
-			if [[ "${VER}" =~ 8* ]] || [[ "${VER}" =~ 9* ]]; then
+			if [[ "${VER}" = 8* ]] || [[ "${VER}" = 9* ]]; then
 				detected_os_proceed && setup_centos_rhel && exit 0
 			fi
 			detected_os_but_unsupported_version;;
