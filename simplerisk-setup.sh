@@ -106,7 +106,7 @@ setup_ubuntu_debian(){
 		exec_cmd 'echo "deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-8.0" | sudo tee /etc/apt/sources.list.d/mysql.list'
 	fi
 
-	if [[ "$OS" = "Debian" ]]; then
+	if [[ "$OS" = "Debian GNU/Linux" ]]; then
 		local apt_php_version
 		apt_php_version=8.1
 		print_status "Populating apt-get cache..."
