@@ -385,14 +385,14 @@ EOF
 	print_status "Configuring MySQL..."
 	local temp_password
 	temp_password=$(create_random_password 100 y)
-	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=${initial_root_password}  --connect-expired-password"
-	exec_cmd "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\" --password=${temp_password}"
-	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\" --password=${temp_password}"
-	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\" --password=${temp_password}"
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\" --password=${temp_password}"
-	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\" --password=${temp_password}"
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\" --password=${temp_password}"
-	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\" --password=${temp_password}"
+	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=\"${initial_root_password}\"  --connect-expired-password"
+	exec_cmd "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\" --password=\"${temp_password}\""
+	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\" --password=\"${temp_password}\""
+	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
+	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
+	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
 	#if [ "${OS}" = "CentOS Linux" ]; then
 	#	exec_cmd "mysql -uroot mysql -e \"DROP DATABASE test\""
 	#	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'localhost'\""
@@ -402,9 +402,10 @@ EOF
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
+	# WIP: Removing NO_AUTO_CREATE_USER
 	cat << EOF >> /etc/my.cnf
 [mysqld]
-sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
 EOF
 
 	print_status "Restarting MySQL to load the new configuration..."
