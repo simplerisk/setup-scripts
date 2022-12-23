@@ -17,6 +17,7 @@
 ###########################################
 set -eo pipefail
 export DEBIAN_FRONTEND=noninteractive
+MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2022'
 
 print_status() {
 	echo
@@ -119,7 +120,7 @@ setup_ubuntu_debian(){
 		exec_cmd 'wget -qO - https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /etc/apt/keyrings/sury-php.gpg'
 
 		print_status "Adding MySQL 8 repository"
-		exec_cmd 'wget -qO - http://repo.mysql.com/RPM-GPG-KEY-mysql-2022 | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg'
+		exec_cmd "wget -qO - $MYSQL_KEY_URL | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg"
 		exec_cmd 'echo "deb [signed-by=/etc/apt/keyrings/mysql.gpg] http://repo.mysql.com/apt/debian bullseye mysql-8.0" | sudo tee /etc/apt/sources.list.d/mysql.list > /dev/null'
 	fi
 
@@ -276,6 +277,7 @@ setup_centos_rhel(){
 
 	print_status "Installing PHP for Apache..."
 	if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
+		# TODO: Modify this section to handle RHEL 8 and 9
 		if [[ "${VER}" = 8* ]]; then
 			exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
 		else
@@ -286,9 +288,9 @@ setup_centos_rhel(){
 		fi
 	else
 		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-		exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
-		exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-		exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl"
+		exec_cmd "rpm -Uvh https://rpms.remirepo.net/enterprise/remi-release-7.rpm"
+		exec_cmd "yum -y --enablerepo=remi,remi-php81 install httpd php php-common"
+		exec_cmd "yum -y --enablerepo=remi,remi-php81 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl"
 	fi
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
@@ -298,24 +300,28 @@ setup_centos_rhel(){
 	print_status "Setting the maximum input variables in PHP to 3000..."
 	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php.ini"
 
-	print_status "Installing the MariaDB database server..."
-	exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
-	if [[ "${VER}" = 7.9 ]]; then
-		if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
-			exec_cmd "yum -y install MariaDB-server"
-		fi
-	else
-		if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
-			exec_cmd "yum -y install perl-DBI libaio libsepol lsof boost-program-options libpmem galera-4"
-			exec_cmd "yum -y install --repo=\"mariadb-main\" MariaDB-server"
-		else
-			exec_cmd "yum -y install MariaDB-server"
-		fi
-	fi
+	print_status 'Installing the MySQL database server...'
+	exec_cmd "rpm --import $MYSQL_KEY_URL"
+	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el7-1.noarch.rpm'
+	exec_cmd 'yum install -y mysql-server'
+	#print_status "Installing the MariaDB database server..."
+	#exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
+	#if [[ "${VER}" = 7.9 ]]; then
+	#	if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
+	#		exec_cmd "yum -y install MariaDB-server"
+	#	fi
+	#else
+	#	if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
+	#		exec_cmd "yum -y install perl-DBI libaio libsepol lsof boost-program-options libpmem galera-4"
+	#		exec_cmd "yum -y install --repo=\"mariadb-main\" MariaDB-server"
+	#	else
+	#		exec_cmd "yum -y install MariaDB-server"
+	#	fi
+	#fi
 
-	print_status "Enabling and starting the MariaDB database server..."
-	exec_cmd "systemctl enable mariadb"
-	exec_cmd "systemctl start mariadb"
+	print_status "Enabling and starting MySQL database server..."
+	exec_cmd "systemctl enable mysqld"
+	exec_cmd "systemctl start mysqld"
 
 	print_status "Installing mod_ssl"
 	exec_cmd "yum -y install mod_ssl"
@@ -384,7 +390,7 @@ sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 EOF
 
 	print_status "Restarting MySQL to load the new configuration..."
-	exec_cmd "systemctl restart mariadb"
+	exec_cmd "systemctl restart mysqld"
 
 	print_status "Removing the SimpleRisk database file..."
 	exec_cmd "rm -r /var/www/simplerisk/database.sql"
