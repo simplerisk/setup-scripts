@@ -111,7 +111,7 @@ setup_ubuntu_debian(){
 		apt_php_version=8.1
 		print_status "Populating apt-get cache..."
 		exec_cmd 'apt-get update'
-		exec_cmd 'apt install gnupg'
+		exec_cmd 'apt install -y gnupg'
 
 		print_status "Adding Ondrej's repository with PHP8"
 		exec_cmd 'echo "deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/sury-php.list > /dev/null'
