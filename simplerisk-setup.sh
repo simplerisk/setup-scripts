@@ -271,38 +271,45 @@ setup_ubuntu_debian(){
 
 # shellcheck disable=SC2120
 setup_centos_rhel(){
+
+	[ "${OS}" == "CentOS Linux" ] && pkg_manager="yum" || pkg_manager="dnf"
+
 	get_simplerisk_version
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
-	print_status "Updating packages with yum.  This may take some time."
-	exec_cmd "yum -y update"
+	print_status "Updating packages with $pkg_manager.  This may take some time."
+	exec_cmd "$pkg_manager -y update"
 	
 	print_status "Installing the wget package..."
-	exec_cmd "yum -y install wget"
+	exec_cmd "$pkg_manager -y install wget"
 
 	print_status "Installing Firewalld"
-	exec_cmd "yum -y install firewalld"
+	exec_cmd "$pkg_manager -y install firewalld"
 
 	print_status "Installing the Apache web server..."
-	exec_cmd "yum -y install httpd"
+	exec_cmd "$pkg_manager -y install httpd"
 
 	print_status "Installing PHP for Apache..."
-	if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
+	if [ "${OS}" = "CentOS Linux" ]; then
+		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+		exec_cmd "rpm -Uvh https://rpms.remirepo.net/enterprise/remi-release-7.rpm"
+		exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php81 install httpd php php-common"
+		exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php81 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl"
+	else
 		# TODO: Modify this section to handle RHEL 8 and 9
 		if [[ "${VER}" = 8* ]]; then
-			exec_cmd "yum -y install php php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
+			exec_cmd "$pkg_manager -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm"
+			exec_cmd "$pkg_manager -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm"
+			exec_cmd "$pkg_manager -y module reset php"
+			exec_cmd "$pkg_manager -y module enable php:remi-8.1"
+			exec_cmd "$pkg_manager -y install php php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
 		else
 			exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
 			exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
-			exec_cmd "yum -y --enablerepo=remi,remi-php74 install httpd php php-common"
-			exec_cmd "yum -y --enablerepo=remi,remi-php74 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl"
+			exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php74 install httpd php php-common"
+			exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php74 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl"
 		fi
-	else
-		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-		exec_cmd "rpm -Uvh https://rpms.remirepo.net/enterprise/remi-release-7.rpm"
-		exec_cmd "yum -y --enablerepo=remi,remi-php81 install httpd php php-common"
-		exec_cmd "yum -y --enablerepo=remi,remi-php81 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl"
 	fi
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
@@ -315,33 +322,17 @@ setup_centos_rhel(){
 	print_status 'Installing the MySQL database server...'
 	exec_cmd "rpm --import $MYSQL_KEY_URL"
 	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el7-1.noarch.rpm'
-	exec_cmd 'yum install -y mysql-server'
-	#print_status "Installing the MariaDB database server..."
-	#exec_cmd "curl -sL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -"
-	#if [[ "${VER}" = 7.9 ]]; then
-	#	if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
-	#		exec_cmd "yum -y install MariaDB-server"
-	#	fi
-	#else
-	#	if [ "${OS}" = "Red Hat Enterprise Linux" ] || [ "${OS}" = "Red Hat Enterprise Linux Server" ]; then
-	#		exec_cmd "yum -y install perl-DBI libaio libsepol lsof boost-program-options libpmem galera-4"
-	#		exec_cmd "yum -y install --repo=\"mariadb-main\" MariaDB-server"
-	#	else
-	#		exec_cmd "yum -y install MariaDB-server"
-	#	fi
-	#fi
+	exec_cmd "$pkg_manager install -y mysql-server"
 
 	print_status "Enabling and starting MySQL database server..."
 	exec_cmd "systemctl enable mysqld"
 	exec_cmd "systemctl start mysqld"
-	local initial_root_password
-	initial_root_password=$(cat /var/log/mysqld.log | grep Note | awk -F " " '{print $NF}')
 
 	print_status "Installing mod_ssl"
-	exec_cmd "yum -y install mod_ssl"
+	exec_cmd "$pkg_manager -y install mod_ssl"
 
 	print_status "Installing sendmail"
-	exec_cmd "yum -y install sendmail sendmail-cf m4"
+	exec_cmd "$pkg_manager -y install sendmail sendmail-cf m4"
 
 	set_up_simplerisk "apache"
 
@@ -383,16 +374,26 @@ EOF
 	generate_passwords
 
 	print_status "Configuring MySQL..."
-	local temp_password
-	temp_password=$(create_random_password 100 y)
-	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=\"${initial_root_password}\"  --connect-expired-password"
-	exec_cmd "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\" --password=\"${temp_password}\""
-	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\" --password=\"${temp_password}\""
-	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
-	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
-	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
+	if [ "${OS}" = "CentOS Linux" ]; then
+		local initial_root_password
+		local temp_password
+		initial_root_password=$(cat /var/log/mysqld.log | grep Note | awk -F " " '{print $NF}')
+		temp_password=$(create_random_password 100 y)
+		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=\"${initial_root_password}\"  --connect-expired-password"
+		exec_cmd "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\" --password=\"${temp_password}\""
+	fi
+	if [ "${OS}" = "CentOS Linux" ]; then
+		local password_flag
+		password_flag=" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
+		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\" --password=\"${temp_password}\""
+	else
+		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+	fi
+	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\"${password_flag:-}"
+	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\"${password_flag:-}"
+	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\"${password_flag:-}"
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\"${password_flag:-}"
+	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\"${password_flag:-}"
 	#if [ "${OS}" = "CentOS Linux" ]; then
 	#	exec_cmd "mysql -uroot mysql -e \"DROP DATABASE test\""
 	#	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'localhost'\""
