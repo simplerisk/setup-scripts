@@ -75,6 +75,28 @@ generate_passwords() {
 	chmod 600 /root/passwords.txt
 }
 
+set_up_database() {
+	# $1 should receive the mysqld path
+	local password_flag
+	if [[ -n $1 ]]; then
+		local initial_root_password
+		local temp_password
+		# mysqld.log path
+		# CentOS 7: /var/log/mysqld.log
+		# SLES 15:  /var/log/mysql/mysqld.log
+		initial_root_password=$(cat $1 | grep Note | awk -F " " '{print $NF}')
+		temp_password="$(create_random_password 100 y)"
+		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=\"${initial_root_password}\" --connect-expired-password"
+		password_flag=" --password='${temp_password}'"
+		exec_cmd "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\"$password_flag"
+	fi
+	exec_cmd "mysql -uroot mysql -e 'CREATE DATABASE simplerisk'${password_flag:-}"
+	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\"${password_flag:-}"
+	exec_cmd "mysql -uroot simplerisk -e '\\. /var/www/simplerisk/database.sql'${password_flag:-}"
+	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\"${password_flag:-}"
+	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
+}
+
 set_up_simplerisk() {
 	print_status "Downloading the latest SimpleRisk release to /var/www/simplerisk..."
 	if [ ! -d /var/www ]; then
@@ -230,16 +252,7 @@ setup_ubuntu_debian(){
 
 	print_status "Configuring MySQL..."
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
-
-	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\""
-
-	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, REFERENCES, INDEX ON simplerisk.* TO 'simplerisk'@'localhost'\""
-
-	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\""
-
-	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+	set_up_database
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
@@ -380,31 +393,11 @@ EOF
 	generate_passwords
 
 	print_status "Configuring MySQL..."
-	if [ "${OS}" = "CentOS Linux" ]; then
-		local initial_root_password
-		local temp_password
-		initial_root_password=$(cat /var/log/mysqld.log | grep Note | awk -F " " '{print $NF}')
-		temp_password=$(create_random_password 100 y)
-		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=\"${initial_root_password}\"  --connect-expired-password"
-		exec_cmd "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\" --password=\"${temp_password}\""
-	fi
-	if [ "${OS}" = "CentOS Linux" ]; then
-		local password_flag
-		password_flag=" --password=\"${NEW_MYSQL_ROOT_PASSWORD}\""
-		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\" --password=\"${temp_password}\""
+	if [[ "${OS}" == "CentOS Linux" ]]; then
+		set_up_database	/var/log/mysqld.log
 	else
-		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+		set_up_database
 	fi
-	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\"${password_flag:-}"
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\"${password_flag:-}"
-	exec_cmd "mysql -uroot simplerisk -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\"${password_flag:-}"
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\"${password_flag:-}"
-	exec_cmd "mysql -uroot simplerisk -e \"UPDATE mysql.db SET References_priv='Y',Index_priv='Y' WHERE db='simplerisk';\"${password_flag:-}"
-	#if [ "${OS}" = "CentOS Linux" ]; then
-	#	exec_cmd "mysql -uroot mysql -e \"DROP DATABASE test\""
-	#	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'localhost'\""
-	#	exec_cmd "mysql -uroot mysql -e \"DROP USER ''@'$(hostname)'\""
-	#fi
 
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
@@ -608,11 +601,12 @@ EOF
 	fi
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
 	exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
-	exec_cmd "mysql -uroot mysql -e \"CREATE DATABASE simplerisk\""
-	exec_cmd "mysql -uroot simplerisk -e \"\\. /var/www/simplerisk/database.sql\""
-	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\""
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\""
-	exec_cmd "mysql -uroot mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\""
+
+	if [[ "${VER}" = 15* ]]; then
+		set_up_database	/var/log/mysql/mysqld.log
+	else
+		set_up_database
+	fi
 	
 	print_status "Setting the SimpleRisk database password..."
 	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
