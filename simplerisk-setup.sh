@@ -8,7 +8,7 @@
 # - Debian 11
 # - CentOS 7
 # - Red Hat Enterprise Linux (RHEL) 8, 9
-# - SUSE Linux Enterprise Server (SLES) 12, 15
+# - SUSE Linux Enterprise Server (SLES) 15
 #
 # Run as root or insert `sudo -E` before `bash`: 
 # curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
@@ -292,7 +292,10 @@ setup_centos_rhel(){
 
 	print_status 'Enabling MySQL 8 repositories...'
 	exec_cmd "rpm --import $MYSQL_KEY_URL"
-	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el7-7.noarch.rpm'
+	case ${VER:0:1} in
+		8) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el8-4.noarch.rpm';;
+		9) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm';;
+	esac
 
 	print_status "Enabling PHP 8 repositories..."
 	exec_cmd "$pkg_manager -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${VER:0:1}.noarch.rpm"
@@ -486,12 +489,10 @@ setup_suse(){
 	print_status "Populating zypper cache..."
 	exec_cmd 'zypper -n update'
 
-	if [[ "${VER}" = 12* ]]; then
-		print_status "Adding PHP 7.3 repository for SLES 12..."
-		SP_VER="${VER: -1}"
-		exec_cmd "yes | zypper -n addrepo -f https://download.opensuse.org/repositories/devel:/languages:/php:/php73/SLE_12_SP${SP_VER}/devel:languages:php:php73.repo"
-		exec_cmd "zypper --gpg-auto-import-keys refresh"
-	fi
+	print_status "Adding MySQL 8 repositories..."
+	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-sl15-6.noarch.rpm'
+	exec_cmd "rpm --import $MYSQL_KEY_URL"
+	exec_cmd 'zypper -n ref'
 
 	print_status "Installing Apache..."
 	exec_cmd "zypper -n install apache2"
@@ -502,8 +503,8 @@ setup_suse(){
 	print_status "Starting Apache..."
 	exec_cmd "systemctl start apache2"
 
-	print_status "Installing MariaDB..."
-	exec_cmd "zypper -n install mariadb mariadb-client mariadb-tools"
+	print_status "Installing MySQL 8..."
+	exec_cmd "zypper -n install mysql-community-server"
 
 	print_status "Enabling MySQL on reboot..."
 	exec_cmd "systemctl enable mysql"
@@ -511,9 +512,9 @@ setup_suse(){
 	print_status "Starting MySQL..."
 	exec_cmd "systemctl start mysql"
 
-	print_status "Installing PHP 7..."
-	exec_cmd "zypper -n install php7 php7-mysql apache2-mod_php7 php7-ldap php7-curl php7-zlib php7-phar php7-mbstring php-posix php-gd php-zip php-intl"
-	exec_cmd "a2enmod php7"
+	print_status "Installing PHP 8..."
+	exec_cmd "zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip"
+	exec_cmd "a2enmod php8"
 
 	print_status "Removing Postfix and Installing Sendmail... (only applies to SLES 12)"
 	if [[ "${VER}" = 12* ]]; then
@@ -588,20 +589,13 @@ EOF
 	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
-	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php7/apache2/php.ini"
-	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php7/apache2/php.ini"
+	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php8/apache2/php.ini"
+	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php8/apache2/php.ini"
 
 	print_status "Setting the maximum input variables in PHP to 3000..."
-	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php7/apache2/php.ini"
+	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php8/apache2/php.ini"
 
 	set_up_simplerisk "wwwrun"
-
-	print_status "Configuring and starting Sendmail... (only applies to SLES 12)"
-	if [[ "${VER}" = 12* ]]; then
-		exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
-		exec_cmd "chown -R mail:mail /var/spool/clientmqueue/"
-		exec_cmd "systemctl start sendmail"
-	fi
 
 	print_status "Restarting Apache to load the new configuration..."
 	exec_cmd "systemctl restart apache2"
