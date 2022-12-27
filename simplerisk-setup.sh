@@ -287,29 +287,34 @@ setup_centos_rhel(){
 	print_status "Installing Firewalld"
 	exec_cmd "$pkg_manager -y install firewalld"
 
-	print_status "Installing the Apache web server..."
-	exec_cmd "$pkg_manager -y install httpd"
+	#print_status "Installing the Apache web server..."
+	#exec_cmd "$pkg_manager -y install httpd"
+
+	print_status 'Enabling MySQL 8 repositories...'
+	exec_cmd "rpm --import $MYSQL_KEY_URL"
+	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el7-7.noarch.rpm'
+
+	print_status "Enabling PHP 8 repositories..."
+	exec_cmd "$pkg_manager -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${VER:0:1}.noarch.rpm"
+	local remi_key_url
+	remi_key_url='https://rpms.remirepo.net/RPM-GPG-KEY-remi'
+	case ${VER:0:1} in
+		8) remi_key_url=$remi_key_url'2018';;
+		9) remi_key_url=$remi_key_url'2021';;
+	esac
+	exec_cmd "rpm --import $remi_key_url"
+	exec_cmd "$pkg_manager -y install https://rpms.remirepo.net/enterprise/remi-release-${VER:0:1}.rpm"
+	exec_cmd "$pkg_manager -y update"
+
 
 	print_status "Installing PHP for Apache..."
 	if [ "${OS}" = "CentOS Linux" ]; then
-		exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-		exec_cmd "rpm -Uvh https://rpms.remirepo.net/enterprise/remi-release-7.rpm"
 		exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php81 install httpd php php-common"
 		exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php81 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl"
 	else
-		# TODO: Modify this section to handle RHEL 8 and 9
-		if [[ "${VER}" = 8* ]]; then
-			exec_cmd "$pkg_manager -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm"
-			exec_cmd "$pkg_manager -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm"
-			exec_cmd "$pkg_manager -y module reset php"
-			exec_cmd "$pkg_manager -y module enable php:remi-8.1"
-			exec_cmd "$pkg_manager -y install php php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
-		else
-			exec_cmd "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
-			exec_cmd "rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm"
-			exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php74 install httpd php php-common"
-			exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php74 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl"
-		fi
+		exec_cmd "$pkg_manager -y module reset php"
+		exec_cmd "$pkg_manager -y module enable php:remi-8.1"
+		exec_cmd "$pkg_manager -y install httpd php php-common php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
 	fi
 
 	print_status "Setting the maximum file upload size in PHP to 5MB and memory limit to 256M..."
@@ -320,8 +325,6 @@ setup_centos_rhel(){
 	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php.ini"
 
 	print_status 'Installing the MySQL database server...'
-	exec_cmd "rpm --import $MYSQL_KEY_URL"
-	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el7-1.noarch.rpm'
 	exec_cmd "$pkg_manager install -y mysql-server"
 
 	print_status "Enabling and starting MySQL database server..."
