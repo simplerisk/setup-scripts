@@ -294,7 +294,7 @@ setup_ubuntu_debian(){
 		fi
 
 		# Add MySQL 8 for Ubuntu 18
-		if [ "${OS}" = 'Ubuntu' ] && [ "${VER}" = '18.04' ]; then
+		if [[ "${OS}" = 'Ubuntu' && "${VER}" = '18.04' ]] || [ "${OS}" = 'Debian GNU/Linux' ]; then
 			print_status 'Adding MySQL 8 repository'
 			exec_cmd "wget -qO - $MYSQL_KEY_URL | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg"
 			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/mysql.gpg] http://repo.mysql.com/apt/ubuntu/ $(lsb_release -sc) mysql-8.0' | sudo tee /etc/apt/sources.list.d/mysql.list"
