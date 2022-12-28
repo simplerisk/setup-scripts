@@ -396,7 +396,9 @@ EOF
 	if [[ "${OS}" == "CentOS Linux" ]]; then
 		set_up_database	/var/log/mysqld.log
 	else
-		set_up_database
+		if [[ "${VER}" = 9* ]]; then
+			set_up_database	/var/log/mysqld.log
+		fi
 	fi
 
 	print_status "Setting the SimpleRisk database password..."
@@ -413,7 +415,6 @@ EOF
 
 	print_status "Removing the SimpleRisk database file..."
 	exec_cmd "rm -r /var/www/simplerisk/database.sql"
-
 	print_status "Setting up Backup cronjob..."
 	set_up_backup_cronjob
 
