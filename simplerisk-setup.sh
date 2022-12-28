@@ -59,7 +59,7 @@ create_random_password() {
 			characters=$1
 		fi
 		if [ $# -eq 2 ]; then
-			char_pattern=$char_pattern"\$\#@%"
+			char_pattern=$char_pattern"!?^@%"
 		fi
 	fi
 	# shellcheck disable=SC2005
