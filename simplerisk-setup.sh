@@ -226,7 +226,7 @@ set_up_simplerisk() {
 }
 
 set_up_backup_cronjob() {
-	exec_cmd "(crontab -l 2>/dev/null; echo \"* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php\") | crontab -"
+	exec_cmd "(crontab -l 2>/dev/null; echo '* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php') | crontab -"
 }
 
 get_simplerisk_version() {
@@ -272,6 +272,9 @@ setup_ubuntu_debian(){
 	get_simplerisk_version
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+
+	print_status 'Populating apt-get cache...'
+	exec_cmd 'apt-get update'
 
 	# Add PHP8 for Ubuntu 18/20|Debian 11
 	if [ "${OS}" != 'Ubuntu' ] || [[ "${VER}" != 22.* ]]; then
