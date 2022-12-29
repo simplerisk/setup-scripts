@@ -14,17 +14,31 @@
 # OR
 # wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
 ###########################################
-set -eo pipefail
+set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2022'
 
 #########################
 ## MAIN FLOW FUNCTIONS ##
 #########################
+setup (){
+	validate_args "${@:1}"
+
+	# Make sure we are running as root
+	check_root
+
+	if [ -z "${HEADLESS:-}" ]; then
+		os_detect
+	else
+		ask_user
+	fi
+}
+
+# DONE: Unattached
 validate_args(){
 	while [[ $# -gt 0 ]]
 	do
-		key="${1}"
+		local key="${1}"
 		case "${key}" in
 			-n|--no-assistance)
 				HEADLESS=y
@@ -41,15 +55,6 @@ validate_args(){
 				exit 1;;
 		esac
 	done
-
-	# Make sure we are running as root
-	check_root
-
-	if [ -n "${HEADLESS}" ]; then
-		os_detect
-	else
-		ask_user
-	fi
 }
 
 ask_user(){
@@ -169,8 +174,7 @@ exec_cmd_nobail() {
 }
 
 create_random_password() {
-	local char_pattern
-	char_pattern='A-Za-z0-9'
+	local char_pattern='A-Za-z0-9'
 	if [ -n "$2" ]; then
 		char_pattern=$char_pattern'!?^@%'
 	fi
@@ -193,8 +197,8 @@ set_up_database() {
 	local password_flag
 	if [[ -n $1 ]]; then
 		local initial_root_password
-		local temp_password
 		initial_root_password=$(grep Note "$1" | awk -F " " '{print $NF}')
+		local temp_password
 		temp_password="$(create_random_password 100 y)"
 		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=\"${initial_root_password}\" --connect-expired-password"
 		password_flag=" --password='${temp_password}'"
@@ -225,9 +229,12 @@ set_up_backup_cronjob() {
 	exec_cmd "(crontab -l 2>/dev/null; echo '* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php') | crontab -"
 }
 
-get_simplerisk_version() {
-	# Get the current SimpleRisk release version
-        CURRENT_SIMPLERISK_VERSION=$(curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1)
+get_current_simplerisk_version() {
+        curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1
+}
+
+get_installed_php_version() {
+	php -v | grep -E '^PHP [[:digit:]]' | awk -F ' ' '{print $2}' | awk -F '.' '{print $NR"."$2}'
 }
 
 #######################
@@ -265,7 +272,7 @@ EOC
 ########################
 # shellcheck disable=SC2120
 setup_ubuntu_debian(){
-	get_simplerisk_version
+	CURRENT_SIMPLERISK_VERSION=get_current_simplerisk_version
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
@@ -275,8 +282,7 @@ setup_ubuntu_debian(){
 	# Add PHP8 for Ubuntu 18/20|Debian 11
 	if [ "${OS}" != 'Ubuntu' ] || [[ "${VER}" != 22.* ]]; then
 		exec_cmd 'mkdir -p /etc/apt/keyrings'
-		local apt_php_version
-		apt_php_version=8.1
+		local apt_php_version=8.1
 		if [ "${OS}" = 'Ubuntu' ]; then
 			print_status "Adding Ondrej's PPA with PHP8"
 			exec_cmd 'add-apt-repository -y ppa:ondrej/php'
@@ -357,8 +363,7 @@ setup_ubuntu_debian(){
 
 	print_status 'Setting the maximum file upload size in PHP to 5MB and memory limit to 256M...'
 
-	local php_version
-	php_version="$(php -v | grep -E '^PHP [[:digit:]]' | cut -d '.' -f 1 | cut -d ' ' -f 2).*"
+	[ -z ${apt_php_version:-} ] && php_version=apt_php_version || php_version=$(get_installed_php_version)
 	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php/$php_version/apache2/php.ini"
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
 	
@@ -420,12 +425,11 @@ setup_ubuntu_debian(){
 
 # shellcheck disable=SC2120
 setup_centos_rhel(){
-
-	[ "${OS}" = 'CentOS Linux' ] && pkg_manager='yum' || pkg_manager='dnf'
-
-	get_simplerisk_version
+	CURRENT_SIMPLERISK_VERSION=get_current_simplerisk_version
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+
+	[ "${OS}" = 'CentOS Linux' ] && pkg_manager='yum' || pkg_manager='dnf'
 
 	print_status "Updating packages with $pkg_manager. This may take some time."
 	exec_cmd "$pkg_manager -y update"
@@ -446,8 +450,7 @@ setup_centos_rhel(){
 
 	print_status 'Enabling PHP 8 repositories...'
 	exec_cmd "$pkg_manager -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${VER:0:1}.noarch.rpm"
-	local remi_key_url
-	remi_key_url='https://rpms.remirepo.net/RPM-GPG-KEY-remi'
+	local remi_key_url='https://rpms.remirepo.net/RPM-GPG-KEY-remi'
 	case ${VER:0:1} in
 		7) exec_cmd "rpm --import ${remi_key_url}";;
 		8) exec_cmd "rpm --import ${remi_key_url}2018";;
@@ -607,7 +610,7 @@ EOF
 
 # shellcheck disable=SC2120
 setup_suse(){
-	get_simplerisk_version
+	CURRENT_SIMPLERISK_VERSION=get_current_simplerisk_version
 
 	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
 
@@ -754,4 +757,4 @@ EOF
 }
 
 ## Defer setup until we have the complete script
-validate_args "${@:1}"
+setup "${@:1}"
