@@ -1,19 +1,5 @@
 #!/usr/bin/env bash
 
-###########################################
-# SIMPLERISK SETUP SCRIPT
-# Currently works for:
-# - Ubuntu 18.04, 20.04, 22.04 and 22.10
-# - Debian 11
-# - CentOS 7
-# - Red Hat Enterprise Linux (RHEL) 8, 9
-# - SUSE Linux Enterprise Server (SLES) 15
-#
-# Run as root or insert `sudo -E` before `bash`: 
-# curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
-# OR
-# wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
-###########################################
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2022'
@@ -24,17 +10,20 @@ MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2022'
 setup (){
 	validate_args "${@:1}"
 
-	# Make sure we are running as root
-	check_root
-
-	if [ -z "${HEADLESS:-}" ]; then
-		os_detect
-	else
+	if [ ! -v VALIDATE_ONLY ]; then
+		check_root
+	fi
+	if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
 		ask_user
 	fi
+	load_os_variables
+	validate_os_and_version
+	if [ -v VALIDATE_ONLY ]; then
+		exit 0
+	fi
+	perform_installation
 }
 
-# DONE: Unattached
 validate_args(){
 	while [[ $# -gt 0 ]]
 	do
@@ -45,6 +34,9 @@ validate_args(){
 				shift;;
 			-d|--debug)
 				DEBUG=y
+				shift;;
+			--validate-os-only)
+				VALIDATE_ONLY=y
 				shift;;
 			-h|--help)
 				print_help
@@ -57,114 +49,134 @@ validate_args(){
 	done
 }
 
+check_root() {
+	## Check to make sure we are running as root
+	if [ ${EUID} -ne 0 ]; then
+		print_error_message "This script must be run as root (unless for only verifying the OS). Try running the command 'sudo bash' and then run this script again."
+	fi
+}
+
 ask_user(){
 	read -r -p 'This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: ' answer < /dev/tty
 	case "${answer}" in
-		Yes|yes|Y|y ) os_detect;;
+		Yes|yes|Y|y ) ;;
 		* ) exit 1;;
 	esac
 }
 
-os_detect(){
+load_os_variables(){
+	# freedesktop.org and systemd
 	if [ -f /etc/os-release ]; then
-		# freedesktop.org and systemd
 		# shellcheck source=/dev/null
 		. /etc/os-release
 		OS=$NAME
 		VER=$VERSION_ID
+	# linuxbase.org
 	elif type lsb_release >/dev/null 2>&1; then
-		# linuxbase.org
 		OS=$(lsb_release -si)
 		VER=$(lsb_release -sr)
+	# For some versions of Debian/Ubuntu without lsb_release command
 	elif [ -f /etc/lsb-release ]; then
-		# For some versions of Debian/Ubuntu without lsb_release command
 		# shellcheck source=/dev/null
 		. /etc/lsb-release
 		OS=$DISTRIB_ID
 		VER=$DISTRIB_RELEASE
+	# Older Debian/Ubuntu/etc.
 	elif [ -f /etc/debian_version ]; then
-		# Older Debian/Ubuntu/etc.
 		OS='Debian GNU/Linux'
 		VER=$(cat /etc/debian_version)
+	# Older SuSE/etc. or Red Hat, CentOS, etc.
 	elif [ -f /etc/SuSe-release ] || [ -f /etc/redhat-release ]; then
-		# Older SuSE/etc. or Red Hat, CentOS, etc.
 		echo 'The SimpleRisk setup script cannot reliably determine which commands to run for this OS. Exiting.'
 		exit 1
+	# Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
 	else
-		# Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
 		OS=$(uname -s)
 		VER=$(uname -r)
 	fi
-
-	validate_os
 }
 
-validate_os(){
+validate_os_and_version(){
+	local valid
 	case "${OS}" in
 		'Ubuntu')
 			if [[ "${VER}" = "18.04" ]] || [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]]; then
-				detected_os_proceed && setup_ubuntu_debian && success_final_message && exit 0
-			fi
-			detected_os_but_unsupported_version;;
+				valid=y
+				SETUP_TYPE=debian
+			fi;;
 		'Debian GNU/Linux')
 			if [ "${VER}" = "11" ]; then
-				detected_os_proceed && setup_ubuntu_debian && success_final_message && exit 0
-			fi
-			detected_os_but_unsupported_version;;
+				valid=y
+				SETUP_TYPE=debian
+			fi;;
 		'CentOS Linux')
 			if [ "${VER}" = "7" ]; then
-				detected_os_proceed && setup_centos_rhel && success_final_message && exit 0
-			fi
-			detected_os_but_unsupported_version;;
+				valid=y
+				SETUP_TYPE=rhel
+			fi;;
 		'Red Hat Enterprise Linux'|'Red Hat Enterprise Linux Server')
 			if [[ "${VER}" = 8* ]] || [[ "${VER}" = 9* ]]; then
-				detected_os_proceed && setup_centos_rhel && success_final_message && exit 0
-			fi
-			detected_os_but_unsupported_version;;
+				valid=y
+				SETUP_TYPE=rhel
+			fi;;
 		'SLES')
 			if [[ "${VER}" = 15* ]]; then
-				detected_os_proceed
-				if [ -z "${HEADLESS:-}" ]; then
+				valid=y
+				if [ ! -v HEADLESS ] || [ ! -v VALIDATE_ONLY ]; then
 					read -r -p 'Before continuing, SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails. Do you still want to proceed? [ Yes / No ]: ' answer < /dev/tty
 					case "${answer}" in
-						Yes|yes|Y|y ) setup_suse && exit 0;;
+						Yes|yes|Y|y ) SETUP_TYPE=suse;;
 						* ) exit 1;;
 					esac
-				else
-					setup_suse && success_final_message && exit 0;
 				fi
-			fi
-			detected_os_but_unsupported_version;;
+			fi;;
 		*)
-			echo 'The SimpleRisk setup script cannot reliably determine which commands to run for this OS. Exiting.' && exit 1;;
+			local unknown=y;;
 	esac
+
+	if [ -n "${valid:-}" ]; then
+		detected_os_message
+	elif [ -z "${valid:-}" ] && [ ! -v unknown ]; then
+		detected_os_unsupported_version_message
+		exit 1
+	else
+		unsupported_os_message
+		exit 1
+	fi
+}
+
+perform_installation() {
+	local current_simplerisk_version
+	current_simplerisk_version=$(get_current_simplerisk_version)
+
+	case "${SETUP_TYPE:-}" in
+		debian) setup_ubuntu_debian current_simplerisk_version;;
+		rhel) setup_centos_rhel current_simplerisk_version;;
+		suse) setup_suse current_simplerisk_version;;
+		*) print_error_message "Could not validate the setup type. Check the perform_installation and validate_os_and_version functions.";;
+	esac
+
+	success_final_message
 }
 
 #########################
 ## AUXILIARY FUNCTIONS ##
 #########################
-check_root() {
-	## Check to make sure we are running as root
-	if [ ${EUID} -ne 0 ]; then
-		print_status 'ERROR: This script must be run as root!'
-		print_status "Try running the command 'sudo bash' and then run this script again..."
-		exit 1
-	fi
-}
-
 print_status() {
 	echo
 	echo "## ${1}"
 	echo
 }
 
-exec_cmd(){
-	exec_cmd_nobail "${1}" || bail
+print_error_message() {
+	echo
+	echo "!!! ERROR: ${1} !!!"
+	echo
+	exit 1
 }
 
-bail() {
-	echo 'Error executing command, exiting'
-	exit 1
+exec_cmd(){
+	exec_cmd_nobail "${1}" || bail
 }
 
 exec_cmd_nobail() {
@@ -212,16 +224,18 @@ set_up_database() {
 }
 
 set_up_simplerisk() {
+# $1 receives the user to set the ownership of the simplerisk directory
+# $2 receives current SimpleRisk's version
 	print_status 'Downloading the latest SimpleRisk release to /var/www/simplerisk...'
 	if [ ! -d /var/www ]; then
 		exec_cmd 'mkdir -p /var/www/'
 	elif [ -d /var/www/html ]; then
 		exec_cmd 'rm -r /var/www/html'
 	fi
-	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www && tar xvzf simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "rm -f /var/www/simplerisk-${CURRENT_SIMPLERISK_VERSION}.tgz"
-	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${CURRENT_SIMPLERISK_VERSION}.sql -O database.sql"
+	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${2}.tgz"
+	exec_cmd "cd /var/www && tar xvzf simplerisk-${2}.tgz"
+	exec_cmd "rm -f /var/www/simplerisk-${2}.tgz"
+	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql -O database.sql"
 	exec_cmd "chown -R ${1}: /var/www/simplerisk"
 }
 
@@ -240,12 +254,16 @@ get_installed_php_version() {
 #######################
 ## MESSAGE FUNCTIONS ##
 #######################
-detected_os_proceed(){
-	echo "Detected that we are running ${OS} ${VER}. Continuing with SimpleRisk setup." 
+detected_os_message(){
+	echo "Detected OS is ${OS} ${VER}, which is supported by this script." 
 }
 
-detected_os_but_unsupported_version(){
-	echo "Detected that we are running ${OS} ${VER}, but this version is not currently supported." && exit 1
+detected_os_unsupported_version_message(){
+	echo "Detected OS is ${OS} ${VER}, but this version is not currently supported by this script."
+}
+
+unsupported_os_message(){
+	echo "Detected OS is ${OS}, but it is unsupported by this script."
 }
 
 success_final_message(){
@@ -258,23 +276,29 @@ print_help() {
 
 Script to set up SimpleRisk on a server.
 
-./simplerisk-setup [-d|--debug] [-n|--no-assistance] [-h|--help]
+./simplerisk-setup [-d|--debug] [-n|--no-assistance] [-h|--help] [--validate-os-only]
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
 -n|--no-assistance:    Runs the script in headless mode (will assume yes on anything)
+--validate-os-only:    Only validates if the current host (OS and version) are supported
+                         by the script. This option does not require running the script
+			 as superuser.
 -h|--help:             Shows instructions on how to use this script
 EOC
+}
+
+bail() {
+	print_error_message 'The command exited with failure. Verify the command output or run the script in debug mode (-d|--debug).'
 }
 
 ########################
 ## OS SETUP FUNCTIONS ##
 ########################
+# In all functions, $1 will receive SimpleRisk's current version
 # shellcheck disable=SC2120
 setup_ubuntu_debian(){
-	CURRENT_SIMPLERISK_VERSION=get_current_simplerisk_version
-
-	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+	print_status "Running SimpleRisk ${1} installer..."
 
 	print_status 'Populating apt-get cache...'
 	exec_cmd 'apt-get update'
@@ -370,7 +394,7 @@ setup_ubuntu_debian(){
 	print_status 'Setting the maximum input variables in PHP to 3000...'
 	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php/$php_version/apache2/php.ini"
 
-	set_up_simplerisk 'www-data'
+	set_up_simplerisk 'www-data' "${1}"
 
 	print_status 'Configuring Apache...'
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
@@ -425,9 +449,7 @@ setup_ubuntu_debian(){
 
 # shellcheck disable=SC2120
 setup_centos_rhel(){
-	CURRENT_SIMPLERISK_VERSION=get_current_simplerisk_version
-
-	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+	print_status "Running SimpleRisk ${1} installer..."
 
 	[ "${OS}" = 'CentOS Linux' ] && pkg_manager='yum' || pkg_manager='dnf'
 
@@ -490,7 +512,7 @@ setup_centos_rhel(){
 	print_status 'Installing sendmail'
 	exec_cmd "$pkg_manager -y install sendmail sendmail-cf m4"
 
-	set_up_simplerisk 'apache'
+	set_up_simplerisk 'apache' "${1}"
 
 	print_status 'Configuring Apache...'
 	if [ "${OS}" = 'Red Hat Enterprise Linux' ] || [ "${OS}" = 'Red Hat Enterprise Linux Server' ]; then
@@ -610,9 +632,7 @@ EOF
 
 # shellcheck disable=SC2120
 setup_suse(){
-	CURRENT_SIMPLERISK_VERSION=get_current_simplerisk_version
-
-	print_status "Running SimpleRisk ${CURRENT_SIMPLERISK_VERSION} installer..."
+	print_status "Running SimpleRisk ${1} installer..."
 
 	print_status 'Populating zypper cache...'
 	exec_cmd 'zypper -n update'
@@ -717,7 +737,7 @@ EOF
 	print_status 'Setting the maximum input variables in PHP to 3000...'
 	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php8/apache2/php.ini"
 
-	set_up_simplerisk 'wwwrun'
+	set_up_simplerisk 'wwwrun' "${1}"
 
 	print_status 'Restarting Apache to load the new configuration...'
 	exec_cmd 'systemctl restart apache2'
