@@ -21,13 +21,6 @@ MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2022'
 #########################
 ## MAIN FLOW FUNCTIONS ##
 #########################
-setup(){
-	# Check to make sure we are running as root
-	check_root
-	# Ask user on how to proceed
-	validate_args "${@:1}"
-}
-
 validate_args(){
 	while [[ $# -gt 0 ]]
 	do
@@ -48,6 +41,9 @@ validate_args(){
 				exit 1;;
 		esac
 	done
+
+	# Make sure we are running as root
+	check_root
 
 	if [ -n "${HEADLESS}" ]; then
 		os_detect
@@ -758,4 +754,4 @@ EOF
 }
 
 ## Defer setup until we have the complete script
-setup "${@:1}"
+validate_args "${@:1}"
