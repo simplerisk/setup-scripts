@@ -150,9 +150,9 @@ perform_installation() {
 	current_simplerisk_version=$(get_current_simplerisk_version)
 
 	case "${SETUP_TYPE:-}" in
-		debian) setup_ubuntu_debian current_simplerisk_version;;
-		rhel) setup_centos_rhel current_simplerisk_version;;
-		suse) setup_suse current_simplerisk_version;;
+		debian) setup_ubuntu_debian "$current_simplerisk_version";;
+		rhel) setup_centos_rhel "$current_simplerisk_version";;
+		suse) setup_suse "$current_simplerisk_version";;
 		*) print_error_message "Could not validate the setup type. Check the perform_installation and validate_os_and_version functions.";;
 	esac
 
@@ -187,10 +187,10 @@ exec_cmd_nobail() {
 
 create_random_password() {
 	local char_pattern='A-Za-z0-9'
-	if [ -n "$2" ]; then
+	if [ -n "${2:-}" ]; then
 		char_pattern=$char_pattern'!?^@%'
 	fi
-	< /dev/urandom tr -dc "${char_pattern}" | head -c"${1:-20}"
+	echo $(< /dev/urandom tr -dc "${char_pattern}" | head -c"${1:-20}")
 }
 
 generate_passwords() {
