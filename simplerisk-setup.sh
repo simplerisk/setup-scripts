@@ -633,9 +633,14 @@ setup_suse(){
 	print_status 'Populating zypper cache...'
 	exec_cmd 'zypper -n update'
 
-	print_status 'Adding MySQL 8 repositories...'
+	print_status 'Adding MySQL 8 repository...'
 	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-sl15-6.noarch.rpm'
 	exec_cmd "rpm --import $MYSQL_KEY_URL"
+
+	print_status 'Adding PHP 8.1 repository...'
+	SP_VER=$(echo "$VER" | cut -d '.' -f 2)
+	exec_cmd "rpm --import https://download.opensuse.org/repositories/devel:/languages:/php:/php81/SLE_15_SP${SP_VER}/repodata/repomd.xml.key"
+	exec_cmd "zypper -n addrepo -f https://download.opensuse.org/repositories/devel:/languages:/php:/php81/SLE_15_SP${SP_VER}/devel:languages:php:php81.repo"
 	exec_cmd 'zypper -n ref'
 
 	print_status 'Installing Apache...'
