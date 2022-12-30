@@ -190,7 +190,9 @@ create_random_password() {
 	if [ -n "${2:-}" ]; then
 		char_pattern=$char_pattern'!?^@%'
 	fi
-	echo $(< /dev/urandom tr -dc "${char_pattern}" | head -c"${1:-20}")
+	# Disabling useless echo (mandatory with set u)
+	# shellcheck disable=SC2005
+	echo "$(< /dev/urandom tr -dc "${char_pattern}" | head -c"${1:-20}")"
 }
 
 generate_passwords() {
@@ -296,7 +298,6 @@ bail() {
 ## OS SETUP FUNCTIONS ##
 ########################
 # In all functions, $1 will receive SimpleRisk's current version
-# shellcheck disable=SC2120
 setup_ubuntu_debian(){
 	print_status "Running SimpleRisk ${1} installer..."
 
@@ -398,13 +399,11 @@ setup_ubuntu_debian(){
 
 	print_status 'Configuring Apache...'
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
-	# shellcheck disable=SC2143
-	if [ ! "$(grep -q "RewriteEngine On" /etc/apache2/sites-enabled/000-default.conf)" ]; then
+	if ! "$(grep -q 'RewriteEngine On' /etc/apache2/sites-enabled/000-default.conf)"; then
 		exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf"
 	fi
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf"
-	# shellcheck disable=SC2143
-	if [ ! "$(grep -q "AllowOverride all" /etc/apache2/sites-enabled/default-ssl.conf)" ]; then
+	if ! "$(grep -q 'AllowOverride all' /etc/apache2/sites-enabled/default-ssl.conf)"; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf"
 	fi
 
@@ -447,7 +446,6 @@ setup_ubuntu_debian(){
 	exec_cmd 'ufw --force enable'
 }
 
-# shellcheck disable=SC2120
 setup_centos_rhel(){
 	print_status "Running SimpleRisk ${1} installer..."
 
@@ -538,8 +536,7 @@ setup_centos_rhel(){
 </VirtualHost>
 EOF
 
-	# shellcheck disable=SC2143
-	if [ ! "$(grep -q 'AllowOverride all' /etc/httpd/conf.d/ssl.conf)" ]; then
+	if ! "$(grep -q 'AllowOverride all' /etc/httpd/conf.d/ssl.conf)"; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
 	fi
 	if [ "${OS}" = 'CentOS Linux' ]; then
@@ -630,7 +627,6 @@ EOF
 	exec_cmd 'chcon -R -t httpd_sys_rw_content_t /var/www/simplerisk'
 }
 
-# shellcheck disable=SC2120
 setup_suse(){
 	print_status "Running SimpleRisk ${1} installer..."
 
