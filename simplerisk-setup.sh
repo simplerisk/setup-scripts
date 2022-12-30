@@ -399,11 +399,11 @@ setup_ubuntu_debian(){
 
 	print_status 'Configuring Apache...'
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
-	if ! "$(grep -q 'RewriteEngine On' /etc/apache2/sites-enabled/000-default.conf)"; then
+	if ! grep -q 'RewriteEngine On' /etc/apache2/sites-enabled/000-default.conf; then
 		exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf"
 	fi
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf"
-	if ! "$(grep -q 'AllowOverride all' /etc/apache2/sites-enabled/default-ssl.conf)"; then
+	if ! grep -q 'AllowOverride all' /etc/apache2/sites-enabled/default-ssl.conf; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf"
 	fi
 
@@ -536,7 +536,7 @@ setup_centos_rhel(){
 </VirtualHost>
 EOF
 
-	if ! "$(grep -q 'AllowOverride all' /etc/httpd/conf.d/ssl.conf)"; then
+	if ! grep -q 'AllowOverride all' /etc/httpd/conf.d/ssl.conf; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
 	fi
 	if [ "${OS}" = 'CentOS Linux' ]; then
