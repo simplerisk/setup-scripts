@@ -733,6 +733,11 @@ EOF
 	print_status 'Setting the maximum input variables in PHP to 3000...'
 	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php8/apache2/php.ini"
 
+	print_status 'Specifying the MySQL socket path...'
+	for extension in mysqli pdo_mysql; do
+		exec_cmd "sed -i 's|\($extension.default_socket\).*|\1=/var/lib/mysql/mysql.sock|' /etc/php8/apache2/php.ini"
+	done
+
 	set_up_simplerisk 'wwwrun' "${1}"
 
 	print_status 'Restarting Apache to load the new configuration...'
@@ -754,7 +759,6 @@ EOF
 	fi
 	
 	print_status 'Setting the SimpleRisk database password...'
-	exec_cmd "sed -i \"s/\(DB_HOSTNAME', \)'localhost/\1'127.0.0.1/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
 
