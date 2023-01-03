@@ -209,7 +209,7 @@ set_up_database() {
 	# CentOS 7, RHEL 9: /var/log/mysqld.log
 	# SLES 15:  /var/log/mysql/mysqld.log
 	local password_flag
-	if [[ -v 1 ]]; then
+	if [ -n ${1:-} ]; then
 		local initial_root_password
 		initial_root_password=$(grep Note "$1" | awk -F " " '{print $NF}')
 		local temp_password
