@@ -491,6 +491,12 @@ setup_centos_rhel(){
 	exec_cmd 'systemctl enable mysqld'
 	exec_cmd 'systemctl start mysqld'
 
+	if [ "${OS}" = 'Red Hat Enterprise Linux' ] && [[ "${VER}" = 8* ]]; then
+		exec_cmd "$pkg_manager clean all"
+		exec_cmd 'rm -rf /var/cache/dnf/remi-*a'
+		exec_cmd "$pkg_manager -y update"
+	fi
+
 	print_status 'Installing mod_ssl'
 	exec_cmd "$pkg_manager -y install mod_ssl"
 
@@ -541,6 +547,8 @@ EOF
 	else
 		if [[ "${VER}" = 9* ]]; then
 			set_up_database	/var/log/mysqld.log
+		else
+			set_up_database
 		fi
 	fi
 
