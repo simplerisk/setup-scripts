@@ -388,7 +388,7 @@ setup_ubuntu_debian(){
 
 	print_status 'Setting the maximum file upload size in PHP to 5MB and memory limit to 256M...'
 
-	[ -z ${apt_php_version:-} ] && php_version=apt_php_version || php_version=$(get_installed_php_version)
+	[ -n "${apt_php_version:-}" ] && php_version=$apt_php_version || php_version=$(get_installed_php_version)
 	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php/$php_version/apache2/php.ini"
 	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
 	
