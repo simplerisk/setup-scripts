@@ -400,7 +400,7 @@ setup_ubuntu_debian(){
 	print_status 'Configuring Apache...'
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
 	if ! grep -q 'RewriteEngine On' /etc/apache2/sites-enabled/000-default.conf; then
-		exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf"
+		exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf"
 	fi
 	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf"
 	if ! grep -q 'AllowOverride all' /etc/apache2/sites-enabled/default-ssl.conf; then
@@ -532,7 +532,7 @@ setup_centos_rhel(){
 	</Directory>
 	RewriteEngine On
 	RewriteCond %{HTTPS} !=on
-	RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+	RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]
 </VirtualHost>
 EOF
 
@@ -689,7 +689,7 @@ setup_suse(){
 	</Directory>
 	RewriteEngine On
 	RewriteCond %{HTTPS} !=on
-	RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+	RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]
 </VirtualHost>
 EOF
 	
