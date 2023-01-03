@@ -348,29 +348,16 @@ setup_ubuntu_debian(){
 		exec_cmd "apt-get install -y php${apt_php_version:-} php${apt_php_version:-}-mysql libapache2-mod-php${apt_php_version:-}"
 	fi
 
-	print_status 'Installing mbstring module for PHP...'
-	exec_cmd "apt-get install -y php${apt_php_version:-}-mbstring"
-
 	print_status 'Installing PHP development libraries...'
 	exec_cmd "apt-get install -y php${apt_php_version:-}-dev"
 
-	print_status 'Installing ldap module for PHP...'
-	exec_cmd "apt-get install -y php${apt_php_version:-}-ldap"
+	for module in xml mbstring ldap curl gd zip intl; do
+		print_status "Installing the $module module for PHP..."
+		exec_cmd "apt-get install -y php${apt_php_version:-}-$module"
+	done
 
 	print_status 'Enabling the ldap module in PHP...'
 	exec_cmd 'phpenmod ldap'
-
-	print_status 'Installing curl module for PHP...'
-	exec_cmd "apt-get install -y php${apt_php_version:-}-curl"
-
-	print_status 'Installing the gd module for PHP...'
-	exec_cmd "apt-get install -y php${apt_php_version:-}-gd"
-
-	print_status 'Installing the zip module for PHP...'
-	exec_cmd "apt-get install -y php${apt_php_version:-}-zip"
-
-	print_status 'Installing the intl module for PHP...'
-	exec_cmd "apt-get install -y php${apt_php_version:-}-intl"
 
 	print_status 'Enabling SSL for Apache...'
 	exec_cmd 'a2enmod rewrite'
