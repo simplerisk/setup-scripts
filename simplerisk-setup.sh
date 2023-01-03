@@ -483,7 +483,7 @@ setup_centos_rhel(){
 	print_status 'Installing PHP for Apache...'
 	if [ "${OS}" = 'CentOS Linux' ]; then
 		exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php81 install httpd php php-common"
-		exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php81 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl"
+		exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php81 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl php-posix"
 	else
 		exec_cmd "$pkg_manager -y module reset php"
 		exec_cmd "$pkg_manager -y module enable php:remi-8.1"
