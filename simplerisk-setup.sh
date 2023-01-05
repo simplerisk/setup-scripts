@@ -659,9 +659,9 @@ setup_suse(){
 	exec_cmd 'a2enmod php8'
 
 	print_status 'Enabling SSL for Apache...'
-	exec_cmd 'a2enmod rewrite'
-	exec_cmd 'a2enmod ssl'
-	exec_cmd 'a2enmod mod_ssl'
+	for module in rewrite ssl mod_ssl; do
+		exec_cmd "a2enmod $module"
+	done
 	
 	print_status 'Enabling Rewrite Module for Apache...'
 	echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
