@@ -231,11 +231,11 @@ set_up_database() {
 set_php_settings() {
 	# $1 receives the path to php settings file
 	print_status 'Setting the maximum file upload size in PHP to 5MB and memory limit to 256M...'
-	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' $1"
-	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' $1"
+	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*/\1 5M/g' $1"
+	exec_cmd "sed -i 's/\(memory_limit =\) .*/\1 256M/g' $1"
 
 	print_status 'Setting the maximum input variables in PHP to 3000...'
-	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' $1"
+	exec_cmd "sed -i 's/\(;\|\#\)\?\(max_input_vars =\).*/\2 3000/g' $1"
 }
 
 set_up_simplerisk() {
