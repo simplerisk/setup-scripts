@@ -9,9 +9,11 @@ MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2022'
 setup (){
 	validate_args "${@:1}"
 
+	# Check root unless you only want to validate if the script works on the host
 	if [ ! -v VALIDATE_ONLY ]; then
 		check_root
 	fi
+	# Ask user input unless it is on headless mode or validating if the script works
 	if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
 		ask_user
 	fi
@@ -134,12 +136,12 @@ validate_os_and_version(){
 	esac
 
 	if [ -n "${valid:-}" ]; then
-		detected_os_message
+		echo "Detected OS is ${OS} ${VER}, which is supported by this script."
 	elif [ -z "${valid:-}" ] && [ ! -v unknown ]; then
-		detected_os_unsupported_version_message
+		echo "Detected OS is ${OS} ${VER}, but this version is not currently supported by this script."
 		exit 1
 	else
-		unsupported_os_message
+		echo "Detected OS is ${OS}, but it is unsupported by this script."
 		exit 1
 	fi
 }
@@ -269,18 +271,6 @@ get_installed_php_version() {
 #######################
 ## MESSAGE FUNCTIONS ##
 #######################
-detected_os_message(){
-	echo "Detected OS is ${OS} ${VER}, which is supported by this script." 
-}
-
-detected_os_unsupported_version_message(){
-	echo "Detected OS is ${OS} ${VER}, but this version is not currently supported by this script."
-}
-
-unsupported_os_message(){
-	echo "Detected OS is ${OS}, but it is unsupported by this script."
-}
-
 success_final_message(){
 	print_status 'Check /root/passwords.txt for the MySQL root and simplerisk passwords.'
 	print_status 'INSTALLATION COMPLETED SUCCESSFULLY'
@@ -464,11 +454,10 @@ setup_centos_rhel(){
 
 	print_status 'Enabling PHP 8 repositories...'
 	exec_cmd "$pkg_manager -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${VER:0:1}.noarch.rpm"
-	local remi_key_url='https://rpms.remirepo.net/RPM-GPG-KEY-remi'
 	case ${VER:0:1} in
-		7) exec_cmd "rpm --import ${remi_key_url}";;
-		8) exec_cmd "rpm --import ${remi_key_url}2018";;
-		9) exec_cmd "rpm --import ${remi_key_url}2021";;
+		7) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi";;
+		8) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2018";;
+		9) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2021";;
 	esac
 	exec_cmd "$pkg_manager -y install https://rpms.remirepo.net/enterprise/remi-release-${VER:0:1}.rpm"
 	exec_cmd "$pkg_manager -y update"
@@ -554,7 +543,6 @@ EOF
 		fi
 	fi
 
-	# WIP: Removing NO_AUTO_CREATE_USER
 	cat << EOF >> /etc/my.cnf
 [mysqld]
 sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
