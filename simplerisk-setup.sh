@@ -584,39 +584,17 @@ EOF
 	exec_cmd 'firewall-cmd --reload'
 
 	print_status 'Configuring SELinux for SimpleRisk...'
-	exec_cmd 'setsebool -P httpd_builtin_scripting=1'
-	exec_cmd 'setsebool -P httpd_can_network_connect=1'
-	exec_cmd 'setsebool -P httpd_can_sendmail=1'
-	exec_cmd 'setsebool -P httpd_dbus_avahi=1'
-	exec_cmd 'setsebool -P httpd_enable_cgi=1'
-	exec_cmd 'setsebool -P httpd_read_user_content=1'
-	exec_cmd 'setsebool -P httpd_tty_comm=1'
-	exec_cmd 'setsebool -P allow_httpd_anon_write=0'
-	exec_cmd 'setsebool -P allow_httpd_mod_auth_ntlm_winbind=0'
-	exec_cmd 'setsebool -P allow_httpd_mod_auth_pam=0'
-	exec_cmd 'setsebool -P allow_httpd_sys_script_anon_write=0'
-	exec_cmd 'setsebool -P httpd_can_check_spam=0'
-	exec_cmd 'setsebool -P httpd_can_network_connect_cobbler=0'
-	exec_cmd 'setsebool -P httpd_can_network_connect_db=0'
-	exec_cmd 'setsebool -P httpd_can_network_memcache=0'
-	exec_cmd 'setsebool -P httpd_can_network_relay=0'
-	exec_cmd 'setsebool -P httpd_dbus_sssd=0'
-	exec_cmd 'setsebool -P httpd_enable_ftp_server=0'
-	exec_cmd 'setsebool -P httpd_enable_homedirs=0'
-	exec_cmd 'setsebool -P httpd_execmem=0'
-	exec_cmd 'setsebool -P httpd_manage_ipa=0'
-	exec_cmd 'setsebool -P httpd_run_preupgrade=0'
-	exec_cmd 'setsebool -P httpd_run_stickshift=0'
-	exec_cmd 'setsebool -P httpd_serve_cobbler_files=0'
-	exec_cmd 'setsebool -P httpd_setrlimit=0'
-	exec_cmd 'setsebool -P httpd_ssi_exec=0'
-	exec_cmd 'setsebool -P httpd_tmp_exec=0'
-	exec_cmd 'setsebool -P httpd_use_cifs=0'
-	exec_cmd 'setsebool -P httpd_use_fusefs=0'
-	exec_cmd 'setsebool -P httpd_use_gpg=0'
-	exec_cmd 'setsebool -P httpd_use_nfs=0'
-	exec_cmd 'setsebool -P httpd_use_openstack=0'
-	exec_cmd 'setsebool -P httpd_verify_dns=0'
+	value_one_permissions=('httpd_builtin_scripting' 'httpd_can_network_connect' 'httpd_can_sendmail' 'httpd_dbus_avahi' 'httpd_enabl
+e_cgi' 'httpd_read_user_content' 'httpd_tty_comm')
+	for permission in "${value_one_permissions[@]}"; do
+		exec_cmd "setsebool -P $permission=1"
+	done
+	value_nil_permissions=('allow_httpd_anon_write' 'allow_httpd_mod_auth_ntlm_winbind' 'allow_httpd_mod_auth_pam' 'allow_httpd_sys_s
+cript_anon_write' 'httpd_can_check_spam' 'httpd_can_network_connect_cobbler' 'httpd_can_network_connect_db' 'httpd_can_network_memcache'
+'httpd_can_network_relay' 'httpd_dbus_sssd' 'httpd_enable_ftp_server' 'httpd_enable_homedirs' 'httpd_execmem' 'httpd_manage_ipa' 'httpd_run_preupgrade' 'httpd_run_stickshift' 'httpd_serve_cobbler_files' 'httpd_setrlimit' 'httpd_ssi_exec' 'httpd_tmp_exec' 'httpd_use_cifs' 'httpd_use_fusefs' 'httpd_use_gpg' 'httpd_use_nfs' 'httpd_use_openstack' 'httpd_verify_dns')
+	for permission in "${value_nil_permissions[@]}"; do
+		exec_cmd "setsebool -P $permission=0"
+	done
 	exec_cmd 'chcon -R -t httpd_sys_rw_content_t /var/www/simplerisk'
 }
 
