@@ -223,6 +223,10 @@ set_up_database() {
 	exec_cmd "mysql -uroot simplerisk -e '\\. /var/www/simplerisk/database.sql'${password_flag:-}"
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\"${password_flag:-}"
 	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
+
+	print_status 'Setting the SimpleRisk database password...'
+	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
 }
 
 set_up_simplerisk() {
@@ -408,10 +412,6 @@ setup_ubuntu_debian(){
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
 	set_up_database
 
-	print_status 'Setting the SimpleRisk database password...'
-	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
-	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
-
 	print_status 'Restarting MySQL to load the new configuration...'
 	exec_cmd 'service mysql restart'
 
@@ -552,9 +552,6 @@ EOF
 		fi
 	fi
 
-	print_status 'Setting the SimpleRisk database password...'
-	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
-	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
 	# WIP: Removing NO_AUTO_CREATE_USER
 	cat << EOF >> /etc/my.cnf
 [mysqld]
@@ -758,10 +755,6 @@ EOF
 		set_up_database
 	fi
 	
-	print_status 'Setting the SimpleRisk database password...'
-	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
-	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
-
 	print_status 'Restarting MySQL to load the new configuration...'
 	exec_cmd 'systemctl restart mysql'
 
