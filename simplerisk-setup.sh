@@ -382,10 +382,10 @@ setup_ubuntu_debian(){
 	exec_cmd 'apt-get install -y sendmail'
 
 	print_status 'Configuring secure settings for Apache...'
-	exec_cmd "sed -i 's/SSLProtocol all -SSLv3/SSLProtocol TLSv1.2/g' /etc/apache2/mods-enabled/ssl.conf"
-	exec_cmd "sed -i 's/#SSLHonorCipherOrder on/SSLHonorCipherOrder on/g' /etc/apache2/mods-enabled/ssl.conf"
-	exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
-	exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
+	exec_cmd "sed -i 's/\(SSLProtocol\) all -SSLv3/\1 TLSv1.2/g' /etc/apache2/mods-enabled/ssl.conf"
+	exec_cmd "sed -i 's/#\?\(SSLHonorCipherOrder\) on/\1 on/g' /etc/apache2/mods-enabled/ssl.conf"
+	exec_cmd "sed -i 's/\(ServerTokens\) OS/\1 Prod/g' /etc/apache2/conf-enabled/security.conf"
+	exec_cmd "sed -i 's/\(ServerSignature\) On/\1 Off/g' /etc/apache2/conf-enabled/security.conf"
 
 	# Obtaining php version to find settings file path
 	[ -n "${apt_php_version:-}" ] && php_version=$apt_php_version || php_version=$(get_installed_php_version)
@@ -395,11 +395,11 @@ setup_ubuntu_debian(){
 	set_up_simplerisk 'www-data' "${1}"
 
 	print_status 'Configuring Apache...'
-	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/000-default.conf"
+	exec_cmd "sed -i 's|\(/var/www/\)html|\1simplerisk|g' /etc/apache2/sites-enabled/000-default.conf"
 	if ! grep -q 'RewriteEngine On' /etc/apache2/sites-enabled/000-default.conf; then
 		exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf"
 	fi
-	exec_cmd "sed -i 's/\/var\/www\/html/\/var\/www\/simplerisk/g' /etc/apache2/sites-enabled/default-ssl.conf"
+	exec_cmd "sed -i 's|/var/www/html|/var/www/simplerisk|g' /etc/apache2/sites-enabled/default-ssl.conf"
 	if ! grep -q 'AllowOverride all' /etc/apache2/sites-enabled/default-ssl.conf; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf"
 	fi
@@ -508,11 +508,11 @@ setup_centos_rhel(){
 
 	print_status 'Configuring Apache...'
 	if [ "${OS}" = 'Red Hat Enterprise Linux' ] || [ "${OS}" = 'Red Hat Enterprise Linux Server' ]; then
-		exec_cmd "sed -i 's/#DocumentRoot \"\/var\/www\/html\"/DocumentRoot \"\/var\/www\/simplerisk\"/' /etc/httpd/conf.d/ssl.conf"
+		exec_cmd "sed -i 's|#\?\(DocumentRoot \"/var/www/\)html\"|\1simplerisk\"|' /etc/httpd/conf.d/ssl.conf"
 		exec_cmd 'rm /etc/httpd/conf.d/welcome.conf'
 	fi
 	exec_cmd 'mkdir /etc/httpd/sites-{available,enabled}'
-	exec_cmd "sed -i 's/\(DocumentRoot \"\/var\/www\).*/\1\"/g' /etc/httpd/conf/httpd.conf"
+	exec_cmd "sed -i 's|\(DocumentRoot \"/var/www\).*|\1\"|g' /etc/httpd/conf/httpd.conf"
 	echo 'IncludeOptional sites-enabled/*.conf' >> /etc/httpd/conf/httpd.conf
 	cat << EOF > /etc/httpd/sites-enabled/simplerisk.conf
 <VirtualHost *:80>
@@ -698,7 +698,7 @@ EOF
 
 	print_status 'Configuring secure settings for Apache...'
 	exec_cmd "sed -i 's/\(SSLProtocol\).*/\1 TLSv1.2/g' /etc/apache2/ssl-global.conf"
-	exec_cmd "sed -i 's/#\(SSLHonorCipherOrder\)/\1/g' /etc/apache2/ssl-global.conf"
+	exec_cmd "sed -i 's/#\?\(SSLHonorCipherOrder\)/\1/g' /etc/apache2/ssl-global.conf"
 	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
 	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
