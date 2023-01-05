@@ -229,6 +229,16 @@ set_up_database() {
 	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
 }
 
+set_php_settings() {
+	# $1 receives the path to php settings file
+	print_status 'Setting the maximum file upload size in PHP to 5MB and memory limit to 256M...'
+	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' $1"
+	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' $1"
+
+	print_status 'Setting the maximum input variables in PHP to 3000...'
+	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' $1"
+}
+
 set_up_simplerisk() {
 # $1 receives the user to set the ownership of the simplerisk directory
 # $2 receives current SimpleRisk's version
@@ -377,14 +387,10 @@ setup_ubuntu_debian(){
 	exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
 	exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
-	print_status 'Setting the maximum file upload size in PHP to 5MB and memory limit to 256M...'
-
+	# Obtaining php version to find settings file path
 	[ -n "${apt_php_version:-}" ] && php_version=$apt_php_version || php_version=$(get_installed_php_version)
-	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php/$php_version/apache2/php.ini"
-	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php/$php_version/apache2/php.ini"
-	
-	print_status 'Setting the maximum input variables in PHP to 3000...'
-	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php/$php_version/apache2/php.ini"
+
+	set_php_settings /etc/php/$php_version/apache2/php.ini
 
 	set_up_simplerisk 'www-data' "${1}"
 
@@ -477,12 +483,7 @@ setup_centos_rhel(){
 		exec_cmd "$pkg_manager -y install httpd php php-common php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
 	fi
 
-	print_status 'Setting the maximum file upload size in PHP to 5MB and memory limit to 256M...'
-	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php.ini"
-	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php.ini"
-
-	print_status 'Setting the maximum input variables in PHP to 3000...'
-	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php.ini"
+	set_php_settings /etc/php.ini
 
 	print_status 'Installing the MySQL database server...'
 	exec_cmd "$pkg_manager install -y mysql-server"
@@ -723,12 +724,7 @@ EOF
 	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
 	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
 
-	print_status 'Setting the maximum file upload size in PHP to 5MB and memory limit to 256M...'
-	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*\(M\)/\1 5\2/g' /etc/php8/apache2/php.ini"
-	exec_cmd "sed -i 's/\(memory_limit =\) .*\(M\)/\1 256\2/g' /etc/php8/apache2/php.ini"
-
-	print_status 'Setting the maximum input variables in PHP to 3000...'
-	exec_cmd "sed -i '/max_input_vars = 1000/a max_input_vars = 3000' /etc/php8/apache2/php.ini"
+	set_php_settings /etc/php8/apache2/php.ini
 
 	print_status 'Specifying the MySQL socket path...'
 	for extension in mysqli pdo_mysql; do
