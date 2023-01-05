@@ -391,7 +391,7 @@ setup_ubuntu_debian(){
 	# Obtaining php version to find settings file path
 	[ -n "${apt_php_version:-}" ] && php_version=$apt_php_version || php_version=$(get_installed_php_version)
 
-	set_php_settings /etc/php/$php_version/apache2/php.ini
+	set_php_settings "/etc/php/$php_version/apache2/php.ini"
 
 	set_up_simplerisk 'www-data' "${1}"
 
@@ -585,14 +585,11 @@ EOF
 	exec_cmd 'firewall-cmd --reload'
 
 	print_status 'Configuring SELinux for SimpleRisk...'
-	value_one_permissions=('httpd_builtin_scripting' 'httpd_can_network_connect' 'httpd_can_sendmail' 'httpd_dbus_avahi' 'httpd_enabl
-e_cgi' 'httpd_read_user_content' 'httpd_tty_comm')
+	value_one_permissions=('httpd_builtin_scripting' 'httpd_can_network_connect' 'httpd_can_sendmail' 'httpd_dbus_avahi' 'httpd_enable_cgi' 'httpd_read_user_content' 'httpd_tty_comm')
 	for permission in "${value_one_permissions[@]}"; do
 		exec_cmd "setsebool -P $permission=1"
 	done
-	value_nil_permissions=('allow_httpd_anon_write' 'allow_httpd_mod_auth_ntlm_winbind' 'allow_httpd_mod_auth_pam' 'allow_httpd_sys_s
-cript_anon_write' 'httpd_can_check_spam' 'httpd_can_network_connect_cobbler' 'httpd_can_network_connect_db' 'httpd_can_network_memcache'
-'httpd_can_network_relay' 'httpd_dbus_sssd' 'httpd_enable_ftp_server' 'httpd_enable_homedirs' 'httpd_execmem' 'httpd_manage_ipa' 'httpd_run_preupgrade' 'httpd_run_stickshift' 'httpd_serve_cobbler_files' 'httpd_setrlimit' 'httpd_ssi_exec' 'httpd_tmp_exec' 'httpd_use_cifs' 'httpd_use_fusefs' 'httpd_use_gpg' 'httpd_use_nfs' 'httpd_use_openstack' 'httpd_verify_dns')
+	value_nil_permissions=('allow_httpd_anon_write' 'allow_httpd_mod_auth_ntlm_winbind' 'allow_httpd_mod_auth_pam' 'allow_httpd_sys_script_anon_write' 'httpd_can_check_spam' 'httpd_can_network_connect_cobbler' 'httpd_can_network_connect_db' 'httpd_can_network_memcache' 'httpd_can_network_relay' 'httpd_dbus_sssd' 'httpd_enable_ftp_server' 'httpd_enable_homedirs' 'httpd_execmem' 'httpd_manage_ipa' 'httpd_run_preupgrade' 'httpd_run_stickshift' 'httpd_serve_cobbler_files' 'httpd_setrlimit' 'httpd_ssi_exec' 'httpd_tmp_exec' 'httpd_use_cifs' 'httpd_use_fusefs' 'httpd_use_gpg' 'httpd_use_nfs' 'httpd_use_openstack' 'httpd_verify_dns')
 	for permission in "${value_nil_permissions[@]}"; do
 		exec_cmd "setsebool -P $permission=0"
 	done
