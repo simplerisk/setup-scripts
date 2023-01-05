@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-export DEBIAN_FRONTEND=noninteractive
 MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2022'
 
 #########################
@@ -313,6 +312,8 @@ bail() {
 ########################
 # In all functions, $1 will receive SimpleRisk's current version
 setup_ubuntu_debian(){
+	export DEBIAN_FRONTEND=noninteractive
+
 	print_status "Running SimpleRisk ${1} installer..."
 
 	print_status 'Populating apt-get cache...'
