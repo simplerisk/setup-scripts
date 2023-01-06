@@ -123,12 +123,14 @@ validate_os_and_version(){
 		'SLES')
 			if [[ "${VER}" = 15* ]]; then
 				valid=y
-				if [ ! -v HEADLESS ] || [ ! -v VALIDATE_ONLY ]; then
+				if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
 					read -r -p 'Before continuing, SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails. Do you still want to proceed? [ Yes / No ]: ' answer < /dev/tty
 					case "${answer}" in
 						Yes|yes|Y|y ) SETUP_TYPE=suse;;
 						* ) exit 1;;
 					esac
+				else
+					SETUP_TYPE=suse
 				fi
 			fi;;
 		*)
