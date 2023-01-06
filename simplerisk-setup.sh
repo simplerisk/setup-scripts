@@ -435,6 +435,7 @@ setup_ubuntu_debian(){
 setup_centos_rhel(){
 	print_status "Running SimpleRisk ${1} installer..."
 
+	# If OS is CentOS, use yum. Else (RHEL), use dnf.
 	[ "${OS}" = 'CentOS Linux' ] && pkg_manager='yum' || pkg_manager='dnf'
 
 	print_status "Updating packages with $pkg_manager. This may take some time."
