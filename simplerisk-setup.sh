@@ -619,7 +619,7 @@ setup_suse(){
 	exec_cmd 'systemctl start mysql'
 
 	print_status 'Installing PHP 8...'
-	exec_cmd 'zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-xml php8-zip'
+	exec_cmd 'zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php-xml'
 	exec_cmd 'a2enmod php8'
 
 	print_status 'Enabling SSL for Apache...'
