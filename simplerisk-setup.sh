@@ -115,6 +115,11 @@ validate_os_and_version(){
 				valid=y
 				SETUP_TYPE=rhel
 			fi;;
+		'CentOS Stream')
+			if [ "${VER}" = "8" ] || [ "${VER}" = "9" ]; then
+				valid=y
+				SETUP_TYPE=rhel
+			fi;;
 		'Red Hat Enterprise Linux'|'Red Hat Enterprise Linux Server')
 			if [[ "${VER}" = 8* ]] || [[ "${VER}" = 9* ]]; then
 				valid=y
@@ -435,7 +440,7 @@ setup_ubuntu_debian(){
 setup_centos_rhel(){
 	print_status "Running SimpleRisk ${1} installer..."
 
-	# If OS is CentOS, use yum. Else (RHEL), use dnf.
+	# If OS is CentOS, use yum. Else (RHEL or CentOS Stream), use dnf.
 	[ "${OS}" = 'CentOS Linux' ] && pkg_manager='yum' || pkg_manager='dnf'
 
 	print_status "Updating packages with $pkg_manager. This may take some time."
@@ -485,7 +490,7 @@ setup_centos_rhel(){
 	exec_cmd 'systemctl enable mysqld'
 	exec_cmd 'systemctl start mysqld'
 
-	if [ "${OS}" = 'Red Hat Enterprise Linux' ] && [[ "${VER}" = 8* ]]; then
+	if [[ "${VER}" = 8* ]]; then
 		exec_cmd "$pkg_manager clean all"
 		exec_cmd 'rm -rf /var/cache/dnf/remi-*a'
 		exec_cmd "$pkg_manager -y update"
