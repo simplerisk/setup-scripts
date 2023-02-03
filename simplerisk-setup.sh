@@ -505,7 +505,7 @@ setup_centos_rhel(){
 	set_up_simplerisk 'apache' "${1}"
 
 	print_status 'Configuring Apache...'
-	if [ "${OS}" = 'Red Hat Enterprise Linux' ] || [ "${OS}" = 'Red Hat Enterprise Linux Server' ]; then
+	if [[ "${OS}" != 'CentOS Linux' ]]; then
 		exec_cmd "sed -i 's|#\?\(DocumentRoot \"/var/www/\)html\"|\1simplerisk\"|' /etc/httpd/conf.d/ssl.conf"
 		exec_cmd 'rm /etc/httpd/conf.d/welcome.conf'
 	fi
