@@ -445,7 +445,7 @@ setup_centos_rhel(){
 
 	print_status "Updating packages with $pkg_manager. This may take some time."
 	exec_cmd "$pkg_manager -y update"
-	
+
 	print_status 'Installing the wget package...'
 	exec_cmd "$pkg_manager -y install wget"
 
@@ -634,7 +634,7 @@ setup_suse(){
 	for module in rewrite ssl mod_ssl; do
 		exec_cmd "a2enmod $module"
 	done
-	
+
 	print_status 'Enabling Rewrite Module for Apache...'
 	echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
 
@@ -657,7 +657,7 @@ setup_suse(){
 	RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]
 </VirtualHost>
 EOF
-	
+
 	# Generate the OpenSSL private key
 	exec_cmd 'openssl genrsa -des3 -passout pass:/passwords/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key'
 	exec_cmd 'openssl rsa -passin pass:/passwords/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key'
@@ -722,7 +722,7 @@ EOF
 	else
 		set_up_database
 	fi
-	
+
 	print_status 'Restarting MySQL to load the new configuration...'
 	exec_cmd 'systemctl restart mysql'
 
