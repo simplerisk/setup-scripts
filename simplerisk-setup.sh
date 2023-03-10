@@ -115,6 +115,11 @@ validate_os_and_version(){
 				valid=y
 				SETUP_TYPE=rhel
 			fi;;
+		'CentOS Stream')
+			if [ "${VER}" = "8" ] || [ "${VER}" = "9" ]; then
+				valid=y
+				SETUP_TYPE=rhel
+			fi;;
 		'Red Hat Enterprise Linux'|'Red Hat Enterprise Linux Server')
 			if [[ "${VER}" = 8* ]] || [[ "${VER}" = 9* ]]; then
 				valid=y
@@ -435,12 +440,12 @@ setup_ubuntu_debian(){
 setup_centos_rhel(){
 	print_status "Running SimpleRisk ${1} installer..."
 
-	# If OS is CentOS, use yum. Else (RHEL), use dnf.
+	# If OS is CentOS, use yum. Else (RHEL or CentOS Stream), use dnf.
 	[ "${OS}" = 'CentOS Linux' ] && pkg_manager='yum' || pkg_manager='dnf'
 
 	print_status "Updating packages with $pkg_manager. This may take some time."
 	exec_cmd "$pkg_manager -y update"
-	
+
 	print_status 'Installing the wget package...'
 	exec_cmd "$pkg_manager -y install wget"
 
@@ -485,7 +490,7 @@ setup_centos_rhel(){
 	exec_cmd 'systemctl enable mysqld'
 	exec_cmd 'systemctl start mysqld'
 
-	if [ "${OS}" = 'Red Hat Enterprise Linux' ] && [[ "${VER}" = 8* ]]; then
+	if [[ "${VER}" = 8* ]]; then
 		exec_cmd "$pkg_manager clean all"
 		exec_cmd 'rm -rf /var/cache/dnf/remi-*a'
 		exec_cmd "$pkg_manager -y update"
@@ -500,7 +505,7 @@ setup_centos_rhel(){
 	set_up_simplerisk 'apache' "${1}"
 
 	print_status 'Configuring Apache...'
-	if [ "${OS}" = 'Red Hat Enterprise Linux' ] || [ "${OS}" = 'Red Hat Enterprise Linux Server' ]; then
+	if [[ "${OS}" != 'CentOS Linux' ]]; then
 		exec_cmd "sed -i 's|#\?\(DocumentRoot \"/var/www/\)html\"|\1simplerisk\"|' /etc/httpd/conf.d/ssl.conf"
 		exec_cmd 'rm /etc/httpd/conf.d/welcome.conf'
 	fi
@@ -629,7 +634,7 @@ setup_suse(){
 	for module in rewrite ssl mod_ssl; do
 		exec_cmd "a2enmod $module"
 	done
-	
+
 	print_status 'Enabling Rewrite Module for Apache...'
 	echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
 
@@ -652,7 +657,7 @@ setup_suse(){
 	RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]
 </VirtualHost>
 EOF
-	
+
 	# Generate the OpenSSL private key
 	exec_cmd 'openssl genrsa -des3 -passout pass:/passwords/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key'
 	exec_cmd 'openssl rsa -passin pass:/passwords/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key'
@@ -717,7 +722,7 @@ EOF
 	else
 		set_up_database
 	fi
-	
+
 	print_status 'Restarting MySQL to load the new configuration...'
 	exec_cmd 'systemctl restart mysql'
 
