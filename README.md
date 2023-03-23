@@ -1,7 +1,7 @@
 # SIMPLERISK SETUP SCRIPT
 
 ## Currently works for:
-- Ubuntu 18.04, 20.04, 22.04 and 22.10
+- Ubuntu 20.04, 22.04 and 22.10
 - Debian 11
 - CentOS 7
 - Red Hat Enterprise Linux (RHEL) 8, 9

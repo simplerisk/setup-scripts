@@ -101,7 +101,7 @@ validate_os_and_version(){
 	local valid
 	case "${OS}" in
 		'Ubuntu')
-			if [[ "${VER}" = "18.04" ]] || [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]]; then
+			if [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
@@ -316,7 +316,7 @@ setup_ubuntu_debian(){
 	print_status 'Populating apt-get cache...'
 	exec_cmd 'apt-get update'
 
-	# Add PHP8 for Ubuntu 18/20|Debian 11
+	# Add PHP8 for Ubuntu 20|Debian 11
 	if [ "${OS}" != 'Ubuntu' ] || [[ "${VER}" != 22.* ]]; then
 		exec_cmd 'mkdir -p /etc/apt/keyrings'
 		local apt_php_version=8.1
@@ -332,8 +332,8 @@ setup_ubuntu_debian(){
 			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
 		fi
 
-		# Add MySQL 8 for Ubuntu 18
-		if [[ "${OS}" = 'Ubuntu' && "${VER}" = '18.04' ]] || [ "${OS}" = 'Debian GNU/Linux' ]; then
+		# Add MySQL 8 for Debian
+		if [ "${OS}" = 'Debian GNU/Linux' ]; then
 			print_status 'Adding MySQL 8 repository'
 			exec_cmd "wget -qO - $MYSQL_KEY_URL | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg"
 			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/mysql.gpg] http://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.0' | sudo tee /etc/apt/sources.list.d/mysql.list"
