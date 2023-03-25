@@ -101,7 +101,7 @@ validate_os_and_version(){
 	local valid
 	case "${OS}" in
 		'Ubuntu')
-			if [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]]; then
+			if [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]] || [[ "${VER}" = 23.* ]]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
@@ -317,7 +317,7 @@ setup_ubuntu_debian(){
 	exec_cmd 'apt-get update'
 
 	# Add PHP8 for Ubuntu 20|Debian 11
-	if [ "${OS}" != 'Ubuntu' ] || [[ "${VER}" != 22.* ]]; then
+	if [ "${OS}" != 'Ubuntu' ] || [[ "${VER}" = '20.04' ]]; then
 		exec_cmd 'mkdir -p /etc/apt/keyrings'
 		local apt_php_version=8.1
 		if [ "${OS}" = 'Ubuntu' ]; then
@@ -346,7 +346,7 @@ setup_ubuntu_debian(){
 	print_status 'Updating current packages (this may take a bit)...'
 	exec_cmd 'apt-get dist-upgrade -qq --assume-yes'
 
-	if [ "${OS}" = 'Ubuntu' ] && [[ "${VER}" = 22* ]]; then
+	if [ "${OS}" = 'Ubuntu' ] && [[ "${VER}" != '20.04' ]]; then
 		print_status 'Installing lamp-server...'
 		exec_cmd 'apt-get install -y lamp-server^'
 	else
