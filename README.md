@@ -4,6 +4,7 @@
 - Ubuntu 20.04, 22.04, 22.10 and 23.04
 - Debian 11
 - CentOS 7
+- CentOS Stream 8, 9
 - Red Hat Enterprise Linux (RHEL) 8, 9
 - SUSE Linux Enterprise Server (SLES) 15
 
