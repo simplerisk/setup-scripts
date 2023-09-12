@@ -455,9 +455,9 @@ setup_centos_rhel(){
 	print_status 'Enabling MySQL 8 repositories...'
 	exec_cmd "rpm --import ${MYSQL_KEY_URL}"
 	case ${VER:0:1} in
-		7) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el7-7.noarch.rpm';;
-		8) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el8-4.noarch.rpm';;
-		9) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm';;
+		7) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el7-10.noarch.rpm';;
+		8) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el8-8.noarch.rpm';;
+		9) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el9-4.noarch.rpm';;
 	esac
 
 	print_status 'Enabling PHP 8 repositories...'
