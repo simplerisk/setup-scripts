@@ -600,7 +600,7 @@ setup_suse(){
 
 	print_status 'Adding MySQL 8 repository...'
 	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-sl15-8.noarch.rpm'
-  exec_cmd "rpm --import http://repo.mysql.com/RPM-GPG-KEY-mysql-2022"
+	exec_cmd "rpm --import http://repo.mysql.com/RPM-GPG-KEY-mysql-2022"
 
 	print_status 'Adding PHP 8.1 repository...'
 	SP_VER=$(echo "$VER" | cut -d '.' -f 2)
