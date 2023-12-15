@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2022'
+MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2023'
 
 #########################
 ## MAIN FLOW FUNCTIONS ##
@@ -599,8 +599,8 @@ setup_suse(){
 	exec_cmd 'zypper -n update'
 
 	print_status 'Adding MySQL 8 repository...'
-	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-sl15-6.noarch.rpm'
-	exec_cmd "rpm --import $MYSQL_KEY_URL"
+	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-sl15-8.noarch.rpm'
+  exec_cmd "rpm --import http://repo.mysql.com/RPM-GPG-KEY-mysql-2022"
 
 	print_status 'Adding PHP 8.1 repository...'
 	SP_VER=$(echo "$VER" | cut -d '.' -f 2)
