@@ -256,7 +256,7 @@ set_up_simplerisk() {
 	elif [ -d /var/www/html ]; then
 		exec_cmd 'rm -r /var/www/html'
 	fi
-	exec_cmd "cd /var/www && wget https://github.com/simplerisk/bundles/raw/master/simplerisk-${2}.tgz"
+	exec_cmd "cd /var/www && wget https://simplerisk-downloads.s3.amazonaws.com/public/bundles/simplerisk-${2}.tgz"
 	exec_cmd "cd /var/www && tar xvzf simplerisk-${2}.tgz"
 	exec_cmd "rm -f /var/www/simplerisk-${2}.tgz"
 	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql -O database.sql"
