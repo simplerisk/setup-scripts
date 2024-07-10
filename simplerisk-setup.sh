@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+
+readonly UBUNTU_OSVAR='Ubuntu'
+readonly DEBIAN_OSVAR='Debian GNU/Linux'
+readonly CENTOS_STREAM_OSVAR='CentOS Stream'
+readonly RHEL_OSVAR='Red Hat Enterprise Linux'
+readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
+readonly SLES_OSVAR='SLES'
+
 MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2023'
 
 #########################
@@ -84,7 +92,7 @@ load_os_variables(){
 		VER=$DISTRIB_RELEASE
 	# Older Debian/Ubuntu/etc.
 	elif [ -f /etc/debian_version ]; then
-		OS='Debian GNU/Linux'
+		OS=$DEBIAN_OSVAR
 		VER=$(cat /etc/debian_version)
 	# Older SuSE/etc. or Red Hat, CentOS, etc.
 	elif [ -f /etc/SuSe-release ] || [ -f /etc/redhat-release ]; then
@@ -100,32 +108,27 @@ load_os_variables(){
 validate_os_and_version(){
 	local valid
 	case "${OS}" in
-		'Ubuntu')
-			if [[ "${VER}" = "20.04" ]] || [[ "${VER}" = 22.* ]] || [[ "${VER}" = 23.* ]]; then
+		"${UBUNTU_OSVAR}")
+			if [ "${VER}" = '20.04' ] || [[ "${VER}" = 22.* ]] || [[ "${VER}" = 23.* ]] || [ "${VER}" = '24.04' ]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
-		'Debian GNU/Linux')
-			if [ "${VER}" = "11" ]; then
+		"${DEBIAN_OSVAR}")
+			if [ "${VER}" = "11" ] || [ "${VER}" = '12' ]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
-		'CentOS Linux')
-			if [ "${VER}" = "7" ]; then
+		"${CENTOS_STREAM_OSVAR}")
+			if [ "${VER}" = "9" ]; then
 				valid=y
 				SETUP_TYPE=rhel
 			fi;;
-		'CentOS Stream')
-			if [ "${VER}" = "8" ] || [ "${VER}" = "9" ]; then
-				valid=y
-				SETUP_TYPE=rhel
-			fi;;
-		'Red Hat Enterprise Linux'|'Red Hat Enterprise Linux Server')
+		"${RHEL_OSVAR}"|"${RHELS_OSVAR}")
 			if [[ "${VER}" = 8* ]] || [[ "${VER}" = 9* ]]; then
 				valid=y
 				SETUP_TYPE=rhel
 			fi;;
-		'SLES')
+		"${SLES_OSVAR}")
 			if [[ "${VER}" = 15* ]]; then
 				valid=y
 				if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
@@ -135,6 +138,7 @@ validate_os_and_version(){
 						* ) exit 1;;
 					esac
 				else
+					echo "This will install postfix. You will need to configure it after the installation."
 					SETUP_TYPE=suse
 				fi
 			fi;;
@@ -317,10 +321,10 @@ setup_ubuntu_debian(){
 	exec_cmd 'apt-get update'
 
 	# Add PHP8 for Ubuntu 20|Debian 11
-	if [ "${OS}" != 'Ubuntu' ] || [[ "${VER}" = '20.04' ]]; then
+	if [ "${OS}" != "${UBUNTU_OSVAR}" ] || [[ "${VER}" = '20.04' ]]; then
 		exec_cmd 'mkdir -p /etc/apt/keyrings'
 		local apt_php_version=8.1
-		if [ "${OS}" = 'Ubuntu' ]; then
+		if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 			print_status "Adding Ondrej's PPA with PHP8"
 			exec_cmd 'add-apt-repository -y ppa:ondrej/php'
 		else
@@ -333,7 +337,7 @@ setup_ubuntu_debian(){
 		fi
 
 		# Add MySQL 8 for Debian
-		if [ "${OS}" = 'Debian GNU/Linux' ]; then
+		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 			print_status 'Adding MySQL 8 repository'
 			exec_cmd "wget -qO - $MYSQL_KEY_URL | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg"
 			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/mysql.gpg] http://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.0' | sudo tee /etc/apt/sources.list.d/mysql.list"
@@ -346,7 +350,7 @@ setup_ubuntu_debian(){
 	print_status 'Updating current packages (this may take a bit)...'
 	exec_cmd 'apt-get dist-upgrade -qq --assume-yes'
 
-	if [ "${OS}" = 'Ubuntu' ] && [[ "${VER}" != '20.04' ]]; then
+	if [ "${OS}" = "${UBUNTU_OSVAR}" ] && [[ "${VER}" != '20.04' ]]; then
 		print_status 'Installing lamp-server...'
 		exec_cmd 'apt-get install -y lamp-server^'
 	else
@@ -358,6 +362,11 @@ setup_ubuntu_debian(){
 
 		print_status 'Installing PHP...'
 		exec_cmd "apt-get install -y php${apt_php_version:-} php${apt_php_version:-}-mysql libapache2-mod-php${apt_php_version:-}"
+
+		if [ "${OS}" = "${DEBIAN_OSVAR}" ] && [ "${VER}" = '12' ]; then
+			print_status 'Installing crontab for Debian 12'
+			exec_cmd 'apt-get install -y cron'
+		fi
 	fi
 
 	print_status 'Installing PHP development libraries...'
@@ -425,7 +434,7 @@ setup_ubuntu_debian(){
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
 
-	if [ "${OS}" = 'Debian GNU/Linux' ]; then
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 		print_status 'Installing UFW firewall...'
 		exec_cmd 'apt-get install -y ufw'
 	fi
@@ -455,7 +464,6 @@ setup_centos_rhel(){
 	print_status 'Enabling MySQL 8 repositories...'
 	exec_cmd "rpm --import ${MYSQL_KEY_URL}"
 	case ${VER:0:1} in
-		7) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el7-10.noarch.rpm';;
 		8) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el8-8.noarch.rpm';;
 		9) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el9-4.noarch.rpm';;
 	esac
@@ -463,7 +471,6 @@ setup_centos_rhel(){
 	print_status 'Enabling PHP 8 repositories...'
 	exec_cmd "$pkg_manager -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${VER:0:1}.noarch.rpm"
 	case ${VER:0:1} in
-		7) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi";;
 		8) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2018";;
 		9) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2021";;
 	esac
@@ -600,7 +607,7 @@ setup_suse(){
 
 	print_status 'Adding MySQL 8 repository...'
 	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-sl15-8.noarch.rpm'
-	exec_cmd "rpm --import http://repo.mysql.com/RPM-GPG-KEY-mysql-2022"
+	exec_cmd "rpm --import http://repo.mysql.com/RPM-GPG-KEY-mysql-2023"
 
 	print_status 'Adding PHP 8.1 repository...'
 	SP_VER=$(echo "$VER" | cut -d '.' -f 2)
