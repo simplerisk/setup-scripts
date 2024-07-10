@@ -1,12 +1,12 @@
 # SIMPLERISK SETUP SCRIPT
 
 ## Currently works for:
-- Ubuntu 20.04, 22.04, 22.10 and 23.04
-- Debian 11
-- CentOS 7
-- CentOS Stream 8, 9
+- Ubuntu LTS 20.04, 22.04, and 24.04
+  - Although it is possible to install on non-LTS versions in between the two most recent LTS versions specified above, we do not support them officially
+- Debian 11, 12
+- CentOS Stream 9
 - Red Hat Enterprise Linux (RHEL) 8, 9
-- SUSE Linux Enterprise Server (SLES) 15
+- SUSE Linux Enterprise Server (SLES) higher than 15.5
 
 ## How to Run
 Run as root or insert `sudo -E` before `bash`:
