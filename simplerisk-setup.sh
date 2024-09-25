@@ -44,6 +44,9 @@ validate_args(){
 			-d|--debug)
 				DEBUG=y
 				shift;;
+			-t|--testing)
+				TESTING=y
+				shift;;
 			--validate-os-only)
 				VALIDATE_ONLY=y
 				shift;;
@@ -272,7 +275,7 @@ set_up_backup_cronjob() {
 }
 
 get_current_simplerisk_version() {
-        curl -sL https://updates.simplerisk.com/Current_Version.xml | grep -oP '<appversion>(.*)</appversion>' | cut -d '>' -f 2 | cut -d '<' -f 1
+	curl -sL "https://updates${TESTING:+-test}.simplerisk.com/releases.xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2
 }
 
 get_installed_php_version() {
@@ -297,6 +300,7 @@ Script to set up SimpleRisk on a server.
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
 -n|--no-assistance:    Runs the script in headless mode (will assume yes on anything)
+-t|--testing:          Picks the current testing version
 --validate-os-only:    Only validates if the current host (OS and version) are supported
                          by the script. This option does not require running the script
 			 as superuser.
