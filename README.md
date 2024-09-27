@@ -1,6 +1,6 @@
-# SIMPLERISK SETUP SCRIPT
+# SimpleRisk Setup Script
 
-## Currently works for:
+## Supported versions
 
 - Ubuntu LTS 20.04, 22.04, and 24.04
   - Although it is possible to install on non-LTS versions in between the two most recent LTS versions specified above,
@@ -10,7 +10,7 @@
 - Red Hat Enterprise Linux (RHEL) 8, 9
 - SUSE Linux Enterprise Server (SLES) higher than 15.5
 
-## How to Run
+## Instructions
 
 Run as root or insert `sudo -E` before `bash`:
 
