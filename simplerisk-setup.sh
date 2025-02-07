@@ -291,6 +291,7 @@ get_installed_php_version() {
 #######################
 success_final_message(){
 	print_status 'Check /root/passwords.txt for the MySQL root and simplerisk passwords.'
+	print_status 'As these passwords are stored in clear text, we recommend immediately moving them into a password manager and deleting this file.'
 	print_status 'INSTALLATION COMPLETED SUCCESSFULLY'
 }
 
