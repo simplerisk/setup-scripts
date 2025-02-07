@@ -9,7 +9,7 @@ readonly RHEL_OSVAR='Red Hat Enterprise Linux'
 readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
 
-MYSQL_KEY_URL='http://repo.mysql.com/RPM-GPG-KEY-mysql-2023'
+MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2023'
 
 #########################
 ## MAIN FLOW FUNCTIONS ##
@@ -344,7 +344,7 @@ setup_ubuntu_debian(){
 		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 			print_status 'Adding MySQL 8 repository'
 			exec_cmd "wget -qO - $MYSQL_KEY_URL | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg"
-			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/mysql.gpg] http://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.0' | sudo tee /etc/apt/sources.list.d/mysql.list"
+			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.0' | sudo tee /etc/apt/sources.list.d/mysql.list"
 		fi
 
 		print_status 'Re-populating apt-get cache with added repos...'
@@ -611,7 +611,7 @@ setup_suse(){
 
 	print_status 'Adding MySQL 8 repository...'
 	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-sl15-8.noarch.rpm'
-	exec_cmd "rpm --import http://repo.mysql.com/RPM-GPG-KEY-mysql-2023"
+	exec_cmd "rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023"
 
 	print_status 'Adding PHP 8.1 repository...'
 	SP_VER=$(echo "$VER" | cut -d '.' -f 2)
