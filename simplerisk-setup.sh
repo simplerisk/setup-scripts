@@ -195,9 +195,13 @@ exec_cmd(){
 }
 
 exec_cmd_nobail() {
-	[ -v DEBUG ] || NO_LOG='> /dev/null 2>&1'
-	echo "+ ${1} ${NO_LOG:-}"
-	bash -c "${1} ${NO_LOG:-}"
+	local NO_LOG=""
+	if [ ! -v DEBUG ]; then
+		NO_LOG="> /dev/null 2>&1"
+	fi
+
+	echo "+ ${1}"
+	bash -c "${1} ${NO_LOG}"
 }
 
 create_random_password() {
