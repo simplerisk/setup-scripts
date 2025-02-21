@@ -9,7 +9,7 @@ readonly RHEL_OSVAR='Red Hat Enterprise Linux'
 readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
 
-MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2023'
+readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2023'
 
 #########################
 ## MAIN FLOW FUNCTIONS ##
@@ -195,13 +195,13 @@ exec_cmd(){
 }
 
 exec_cmd_nobail() {
-	local NO_LOG=""
+	local no_log=""
 	if [ ! -v DEBUG ]; then
-		NO_LOG="> /dev/null 2>&1"
+		no_log='> /dev/null 2>&1'
 	fi
 
 	echo "+ ${1}"
-	bash -c "${1} ${NO_LOG}"
+	bash -c "${1} ${no_log}"
 }
 
 create_random_password() {
@@ -349,7 +349,7 @@ setup_ubuntu_debian(){
 		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 			print_status 'Adding MySQL 8 repository'
 			exec_cmd "wget -qO - $MYSQL_KEY_URL | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg"
-			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.0' | sudo tee /etc/apt/sources.list.d/mysql.list"
+			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
 		fi
 
 		print_status 'Re-populating apt-get cache with added repos...'
@@ -471,10 +471,10 @@ setup_centos_rhel(){
 	exec_cmd "$pkg_manager -y install firewalld"
 
 	print_status 'Enabling MySQL 8 repositories...'
-	exec_cmd "rpm --import ${MYSQL_KEY_URL}"
+	exec_cmd "rpm --import $MYSQL_KEY_URL"
 	case ${VER:0:1} in
-		8) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el8-8.noarch.rpm';;
-		9) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-el9-4.noarch.rpm';;
+		8) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-el8-1.noarch.rpm';;
+		9) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-el9-1.noarch.rpm';;
 	esac
 
 	print_status 'Enabling PHP 8 repositories...'
@@ -615,8 +615,8 @@ setup_suse(){
 	exec_cmd 'zypper -n update'
 
 	print_status 'Adding MySQL 8 repository...'
-	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql80-community-release-sl15-8.noarch.rpm'
-	exec_cmd "rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023"
+	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm'
+	exec_cmd "rpm --import $MYSQL_KEY_URL"
 
 	print_status 'Adding PHP 8.1 repository...'
 	SP_VER=$(echo "$VER" | cut -d '.' -f 2)
@@ -674,12 +674,15 @@ setup_suse(){
 </VirtualHost>
 EOF
 
+	generate_passwords
+
 	# Generate the OpenSSL private key
-	exec_cmd 'openssl genrsa -des3 -passout pass:/passwords/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key'
-	exec_cmd 'openssl rsa -passin pass:/passwords/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key'
+	exec_cmd 'openssl rand -hex 50 > /tmp/pass_openssl.txt'
+	exec_cmd 'openssl genrsa -des3 -passout file:/tmp/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key'
+	exec_cmd 'openssl rsa -passin file:/tmp/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key'
 
 	# Remove the original key file
-	exec_cmd 'rm /etc/apache2/ssl.key/simplerisk.pass.key'
+	exec_cmd 'rm /etc/apache2/ssl.key/simplerisk.pass.key /tmp/pass_openssl.txt'
 
 	# Generate the CSR
 	exec_cmd 'openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out  /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk"'
@@ -723,8 +726,6 @@ EOF
 
 	print_status 'Restarting Apache to load the new configuration...'
 	exec_cmd 'systemctl restart apache2'
-
-	generate_passwords
 
 	print_status 'Configuring MySQL...'
 	if [[ "${VER}" = 15* ]]; then
