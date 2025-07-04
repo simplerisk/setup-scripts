@@ -2,9 +2,9 @@
 
 ## Supported versions
 
-- Ubuntu LTS 20.04, 22.04, and 24.04
-  - Although it is possible to install on non-LTS versions in between the two most recent LTS versions specified above,
-    we do not support them officially
+- Ubuntu LTS 22.04, and 24.04
+  - Although it is possible to install on non-LTS versions in between the two most recent LTS versions or above the most
+    recent version specified above, we do not support them officially
 - Debian 11, 12
 - CentOS Stream 9
 - Red Hat Enterprise Linux (RHEL) 8, 9

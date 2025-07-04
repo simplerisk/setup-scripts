@@ -112,7 +112,7 @@ validate_os_and_version(){
 	local valid
 	case "${OS}" in
 		"${UBUNTU_OSVAR}")
-			if [ "${VER}" = '20.04' ] || [[ "${VER}" = 22.* ]] || [[ "${VER}" = 23.* ]] || [ "${VER}" = '24.04' ]; then
+			if [ "${VER}" = '22.04' ] || [[ "${VER}" = 24.* ]] || [[ "${VER}" = 25.* ]]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
@@ -381,7 +381,7 @@ setup_ubuntu_debian(){
 	print_status 'Installing PHP development libraries...'
 	exec_cmd "apt-get install -y php${apt_php_version:-}-dev"
 
-	for module in xml mbstring ldap curl gd zip intl; do
+	for module in xml mbstring mysql ldap curl gd zip intl; do
 		print_status "Installing the $module module for PHP..."
 		exec_cmd "apt-get install -y php${apt_php_version:-}-$module"
 	done
