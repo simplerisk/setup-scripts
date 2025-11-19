@@ -614,9 +614,11 @@ setup_suse(){
 	print_status 'Populating zypper cache...'
 	exec_cmd 'zypper -n update'
 
-	print_status 'Adding MySQL 8 repository...'
-	exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm'
-	exec_cmd "rpm --import $MYSQL_KEY_URL"
+	if ! rpm -q mysql84-community-release; then
+		print_status 'Adding MySQL 8 repository...'
+		exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm'
+		exec_cmd "rpm --import $MYSQL_KEY_URL"
+	fi
 
 	print_status 'Installing Apache...'
 	exec_cmd 'zypper -n install apache2'
