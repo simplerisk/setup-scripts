@@ -498,8 +498,12 @@ setup_ubuntu_debian(){
 	else
 		echo "!!! WARNING: /etc/hosts is not writable, skipping hostname modification."
 	fi
+
+	# Configure sendmail
 	exec_cmd 'yes | sendmailconfig'
-	exec_cmd 'service sendmail start'
+
+	# Start sendmail if not already running (prevents errors)
+	exec_cmd 'service sendmail status >/dev/null 2>&1 || service sendmail start'
 
 	print_status 'Restarting Apache to load the new configuration...'
 	exec_cmd 'service apache2 restart'
