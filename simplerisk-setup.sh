@@ -272,6 +272,10 @@ set_up_simplerisk() {
 	exec_cmd "rm -f /var/www/simplerisk-${2}.tgz"
 	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql -O database.sql"
 	exec_cmd "chown -R ${1}: /var/www/simplerisk"
+	if [ ! -d /var/log/simplerisk ]; then
+		exec_cmd 'mkdir -p /var/log/simplerisk'
+	fi
+	exec_cmd "chown -R ${1}: /var/log/simplerisk"
 }
 
 set_up_backup_cronjob() {
