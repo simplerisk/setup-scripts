@@ -284,6 +284,19 @@ set_up_backup_cronjob() {
 
 setup_rsyslog_config() {
 	# $1 receives the web server user (www-data for Debian/Ubuntu, apache for RHEL/CentOS, wwwrun for SLES)
+	print_status 'Installing rsyslog...'
+	case "${SETUP_TYPE}" in
+		debian)
+			exec_cmd 'apt-get install -y rsyslog'
+			;;
+		rhel)
+			exec_cmd 'dnf install -y rsyslog'
+			;;
+		suse)
+			exec_cmd 'zypper -n install rsyslog'
+			;;
+	esac
+
 	print_status 'Setting up rsyslog configuration for SimpleRisk...'
 	cat > /etc/rsyslog.d/60-simplerisk.conf << 'EOF'
 # /etc/rsyslog.d/60-simplerisk.conf
@@ -295,6 +308,19 @@ EOF
 
 setup_logrotate_config() {
 	# $1 receives the web server user (www-data for Debian/Ubuntu, apache for RHEL/CentOS, wwwrun for SLES)
+	print_status 'Installing logrotate...'
+	case "${SETUP_TYPE}" in
+		debian)
+			exec_cmd 'apt-get install -y logrotate'
+			;;
+		rhel)
+			exec_cmd 'dnf install -y logrotate'
+			;;
+		suse)
+			exec_cmd 'zypper -n install logrotate'
+			;;
+	esac
+
 	print_status 'Setting up logrotate configuration for SimpleRisk...'
 	cat > /etc/logrotate.d/simplerisk << EOF
 /var/log/simplerisk/simplerisk.log {
@@ -314,6 +340,10 @@ setup_logrotate_config() {
     endscript
 }
 EOF
+
+	print_status 'Enabling logrotate cron job...'
+	exec_cmd 'systemctl enable logrotate.timer'
+	exec_cmd 'systemctl start logrotate.timer'
 }
 
 get_current_simplerisk_version() {
