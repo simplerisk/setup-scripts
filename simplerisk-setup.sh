@@ -304,42 +304,20 @@ set_up_backup_cronjob() {
 setup_rsyslog_config() {
 	# $1 receives the web server user (www-data for Debian/Ubuntu, apache for RHEL/CentOS, wwwrun for SLES)
 	print_status 'Installing rsyslog...'
-	case "${SETUP_TYPE}" in
-		debian)
-			exec_cmd 'apt-get install -y rsyslog'
-			;;
-		rhel)
-			exec_cmd 'dnf install -y rsyslog'
-			;;
-		suse)
-			exec_cmd 'zypper -n install rsyslog'
-			;;
-	esac
-
+	install_package rsyslog
 	print_status 'Setting up rsyslog configuration for SimpleRisk...'
 	cat > /etc/rsyslog.d/60-simplerisk.conf << 'EOF'
 # /etc/rsyslog.d/60-simplerisk.conf
 # Dedicated log for SimpleRisk (LOCAL0)
 local0.*    /var/log/simplerisk/simplerisk.log
 EOF
-	exec_cmd 'systemctl restart rsyslog'
+	manage_service rsyslog restart
 }
 
 setup_logrotate_config() {
 	# $1 receives the web server user (www-data for Debian/Ubuntu, apache for RHEL/CentOS, wwwrun for SLES)
 	print_status 'Installing logrotate...'
-	case "${SETUP_TYPE}" in
-		debian)
-			exec_cmd 'apt-get install -y logrotate'
-			;;
-		rhel)
-			exec_cmd 'dnf install -y logrotate'
-			;;
-		suse)
-			exec_cmd 'zypper -n install logrotate'
-			;;
-	esac
-
+	install_package logrotate
 	print_status 'Setting up logrotate configuration for SimpleRisk...'
 	cat > /etc/logrotate.d/simplerisk << EOF
 /var/log/simplerisk/simplerisk.log {
@@ -359,10 +337,9 @@ setup_logrotate_config() {
     endscript
 }
 EOF
-
 	print_status 'Enabling logrotate cron job...'
-	exec_cmd 'systemctl enable logrotate.timer'
-	exec_cmd 'systemctl start logrotate.timer'
+	manage_service logrotate.timer enable
+	manage_service logrotate.timer start
 }
 
 get_current_simplerisk_version() {
@@ -371,6 +348,55 @@ get_current_simplerisk_version() {
 
 get_installed_php_version() {
 	php -v | grep -E '^PHP [[:digit:]]' | awk -F ' ' '{print $2}' | awk -F '.' '{print $NR"."$2}'
+}
+
+# Install a package depending on distro
+install_package() {
+    local package="$1"
+
+    case "${SETUP_TYPE}" in
+        debian)
+            exec_cmd "apt-get update && apt-get install -y $package"
+            ;;
+        rhel)
+            exec_cmd "dnf install -y $package"
+            ;;
+        suse)
+            exec_cmd "zypper -n install $package"
+            ;;
+        *)
+            echo "!!! WARNING: Unknown SETUP_TYPE, cannot install $package."
+            ;;
+    esac
+}
+
+########################################
+# Start, enable, or restart a service
+# $1 = service or timer name (e.g., rsyslog, logrotate.timer)
+# $2 = action: start | restart | enable (default: restart)
+########################################
+manage_service() {
+	local service="$1"
+	local action="${2:-restart}"
+
+	# Skip in Docker
+	if [ -f /.dockerenv ] || grep -qE '/docker|/lxc' /proc/1/cgroup 2>/dev/null; then
+		echo "!!! INFO: Running inside Docker, skipping $action of $service."
+		return 0
+	fi
+
+	if command -v systemctl >/dev/null 2>&1; then
+		exec_cmd "systemctl $action $service"
+	elif command -v service >/dev/null 2>&1; then
+		# service command usually supports start/restart, not enable
+		if [ "$action" = "enable" ]; then
+			echo "!!! INFO: 'service' command does not support enable, skipping $service."
+		else
+			exec_cmd "service $service $action"
+		fi
+	else
+		echo "!!! WARNING: Could not $action $service, neither systemctl nor service found."
+	fi
 }
 
 #######################
@@ -522,10 +548,10 @@ setup_ubuntu_debian(){
 	exec_cmd 'yes | sendmailconfig'
 
 	# Start sendmail if not already running (prevents errors)
-	exec_cmd 'service sendmail status >/dev/null 2>&1 || service sendmail start'
+	manage_service sendmail restart
 
 	print_status 'Restarting Apache to load the new configuration...'
-	exec_cmd 'service apache2 restart'
+	manage_service apache2 restart
 
 	generate_passwords
 
@@ -536,7 +562,7 @@ setup_ubuntu_debian(){
 
 	# Restart MySQL so the new config takes effect
 	print_status 'Restarting MySQL to load the new configuration...'
-	exec_cmd 'service mysql restart'
+	manage_service mysql restart
 
 	# Ensure MySQL is ready before continuing
 	print_status 'Waiting for MySQL to be ready...'
@@ -547,7 +573,7 @@ setup_ubuntu_debian(){
 	set_up_database
 
 	print_status 'Restarting MySQL to load the new configuration...'
-	exec_cmd 'service mysql restart'
+	manage_service mysql restart
 
 	print_status 'Removing the SimpleRisk database file...'
 	exec_cmd 'rm -r /var/www/simplerisk/database.sql'
@@ -618,8 +644,8 @@ setup_centos_rhel(){
 	exec_cmd "$pkg_manager install -y mysql-server"
 
 	print_status 'Enabling and starting MySQL database server...'
-	exec_cmd 'systemctl enable mysqld'
-	exec_cmd 'systemctl start mysqld'
+	manage_service mysqld enable
+	manage_service mysqld start
 
 	if [[ "${VER}" = 8* ]]; then
 		exec_cmd "$pkg_manager clean all"
@@ -688,7 +714,7 @@ sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
 EOF
 
 	print_status 'Restarting MySQL to load the new configuration...'
-	exec_cmd 'systemctl restart mysqld'
+	manage_service mysqld restart
 
 	print_status 'Removing the SimpleRisk database file...'
 	exec_cmd 'rm -r /var/www/simplerisk/database.sql'
@@ -699,8 +725,8 @@ EOF
 	setup_logrotate_config 'apache'
 
 	print_status 'Enabling and starting the Apache web server...'
-	exec_cmd 'systemctl enable httpd'
-	exec_cmd 'systemctl start httpd'
+	manage_service httpd enable
+	manage_service httpd start
 
 	print_status 'Configuring and starting Sendmail...'
 	# Detect if running inside Docker
@@ -712,11 +738,11 @@ EOF
         else
                 echo "!!! WARNING: /etc/hosts is not writable, skipping hostname modification."
         fi
-	exec_cmd 'systemctl start sendmail'
+	manage_service sendmail start
 
 	print_status 'Opening Firewall for HTTP/HTTPS traffic'
-	exec_cmd 'systemctl enable firewalld'
-	exec_cmd 'systemctl start firewalld'
+	manage_service firewalld enable
+	manage_service firewalld start
 	for service in http https ssh; do
 		exec_cmd "firewall-cmd --permanent --zone=public --add-service=${service}"
 	done
@@ -750,19 +776,19 @@ setup_suse(){
 	exec_cmd 'zypper -n install apache2'
 
 	print_status 'Enabling Apache on reboot...'
-	exec_cmd 'systemctl enable apache2'
+	manage_service apache2 enable
 
 	print_status 'Starting Apache...'
-	exec_cmd 'systemctl start apache2'
+	manage_service apache2 start
 
 	print_status 'Installing MySQL 8...'
-	exec_cmd 'zypper -n install mysql-community-server'
+	install_package mysql-community-server
 
 	print_status 'Enabling MySQL on reboot...'
-	exec_cmd 'systemctl enable mysql'
+	manage_service mysql enable
 
 	print_status 'Starting MySQL...'
-	exec_cmd 'systemctl start mysql'
+	manage_service mysql start
 
 	print_status 'Installing PHP 8...'
 	exec_cmd 'zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php-xml'
@@ -847,7 +873,7 @@ EOF
 	set_up_simplerisk 'wwwrun' "${1}"
 
 	print_status 'Restarting Apache to load the new configuration...'
-	exec_cmd 'systemctl restart apache2'
+	manage_service apache2 restart
 
 	print_status 'Configuring MySQL...'
 	if [[ "${VER}" = 15* ]]; then
@@ -858,7 +884,7 @@ EOF
 
         # Restart MySQL so the new config takes effect
         print_status 'Restarting MySQL to load the new configuration...'
-        exec_cmd 'systemctl restart mysql'
+	manage_service mysql restart
 
         # Ensure MySQL is ready before continuing
         print_status 'Waiting for MySQL to be ready...'
@@ -873,7 +899,7 @@ EOF
 	fi
 
 	print_status 'Restarting MySQL to load the new configuration...'
-	exec_cmd 'systemctl restart mysql'
+	manage_service mysql restart
 
 	print_status 'Removing the SimpleRisk database file...'
 	exec_cmd 'rm -r /var/www/simplerisk/database.sql'
