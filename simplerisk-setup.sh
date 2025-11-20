@@ -279,7 +279,26 @@ set_up_simplerisk() {
 }
 
 set_up_backup_cronjob() {
-	exec_cmd "(crontab -l 2>/dev/null; echo '* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php') | crontab -"
+    print_status 'Installing cron...'
+
+    if ! command -v crontab >/dev/null 2>&1; then
+        case "${SETUP_TYPE}" in
+            debian)
+                exec_cmd 'apt-get install -y cron'
+                ;;
+            rhel)
+                exec_cmd 'dnf install -y cron'
+                ;;
+            suse)
+                exec_cmd 'zypper -n install cron'
+                ;;
+        esac
+    else
+        echo "!!! INFO: cron is already installed, skipping installation."
+    fi
+
+    print_status 'Setting up cron configuration for SimpleRisk...'
+    exec_cmd "(crontab -l 2>/dev/null; echo '* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php') | crontab -"
 }
 
 setup_rsyslog_config() {
