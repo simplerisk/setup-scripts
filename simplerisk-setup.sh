@@ -489,7 +489,15 @@ setup_ubuntu_debian(){
 	fi
 
 	print_status 'Configuring Sendmail...'
-	exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+	# Detect if running inside Docker
+	if [ -f /.dockerenv ] || grep -qE '/docker|/lxc' /proc/1/cgroup 2>/dev/null; then
+		echo "!!! INFO: Running inside Docker, skipping /etc/hosts modification."
+	# Only edit /etc/hosts if it's writable
+	elif [ -w /etc/hosts ]; then
+		exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+	else
+		echo "!!! WARNING: /etc/hosts is not writable, skipping hostname modification."
+	fi
 	exec_cmd 'yes | sendmailconfig'
 	exec_cmd 'service sendmail start'
 
@@ -659,7 +667,15 @@ EOF
 	exec_cmd 'systemctl start httpd'
 
 	print_status 'Configuring and starting Sendmail...'
-	exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+	# Detect if running inside Docker
+        if [ -f /.dockerenv ] || grep -qE '/docker|/lxc' /proc/1/cgroup 2>/dev/null; then
+                echo "!!! INFO: Running inside Docker, skipping /etc/hosts modification."
+        # Only edit /etc/hosts if it's writable
+        elif [ -w /etc/hosts ]; then
+		exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+        else
+                echo "!!! WARNING: /etc/hosts is not writable, skipping hostname modification."
+        fi
 	exec_cmd 'systemctl start sendmail'
 
 	print_status 'Opening Firewall for HTTP/HTTPS traffic'
