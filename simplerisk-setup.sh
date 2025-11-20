@@ -511,7 +511,20 @@ setup_ubuntu_debian(){
 	generate_passwords
 
 	print_status 'Configuring MySQL...'
+
+	# Update MySQL config
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
+
+	# Restart MySQL so the new config takes effect
+	print_status 'Restarting MySQL to load the new configuration...'
+	exec_cmd 'service mysql restart'
+
+	# Ensure MySQL is ready before continuing
+	print_status 'Waiting for MySQL to be ready...'
+	until mysqladmin ping >/dev/null 2>&1; do
+		sleep 2
+	done
+
 	set_up_database
 
 	print_status 'Restarting MySQL to load the new configuration...'
@@ -823,6 +836,16 @@ EOF
 	fi
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
 	exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
+
+        # Restart MySQL so the new config takes effect
+        print_status 'Restarting MySQL to load the new configuration...'
+        exec_cmd 'systemctl restart mysql'
+
+        # Ensure MySQL is ready before continuing
+        print_status 'Waiting for MySQL to be ready...'
+        until mysqladmin ping >/dev/null 2>&1; do
+                sleep 2
+        done
 
 	if [[ "${VER}" = 15* ]]; then
 		set_up_database	/var/log/mysql/mysqld.log
