@@ -282,6 +282,40 @@ set_up_backup_cronjob() {
 	exec_cmd "(crontab -l 2>/dev/null; echo '* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php') | crontab -"
 }
 
+setup_rsyslog_config() {
+	# $1 receives the web server user (www-data for Debian/Ubuntu, apache for RHEL/CentOS, wwwrun for SLES)
+	print_status 'Setting up rsyslog configuration for SimpleRisk...'
+	cat > /etc/rsyslog.d/60-simplerisk.conf << 'EOF'
+# /etc/rsyslog.d/60-simplerisk.conf
+# Dedicated log for SimpleRisk (LOCAL0)
+local0.*    /var/log/simplerisk/simplerisk.log
+EOF
+	exec_cmd 'systemctl restart rsyslog'
+}
+
+setup_logrotate_config() {
+	# $1 receives the web server user (www-data for Debian/Ubuntu, apache for RHEL/CentOS, wwwrun for SLES)
+	print_status 'Setting up logrotate configuration for SimpleRisk...'
+	cat > /etc/logrotate.d/simplerisk << EOF
+/var/log/simplerisk/simplerisk.log {
+    daily
+    rotate 30
+    compress
+    missingok
+    notifempty
+    create 0640 ${1} ${1}
+    dateext
+    dateformat -%Y%m%d
+    sharedscripts
+    postrotate
+        # Optional: reload service if needed
+        # For example, if SimpleRisk had a daemon that needed to reopen the log:
+        # systemctl reload simplerisk.service >/dev/null 2>&1 || true
+    endscript
+}
+EOF
+}
+
 get_current_simplerisk_version() {
 	curl -sL "https://updates${TESTING:+-test}.simplerisk.com/releases.xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2
 }
@@ -447,6 +481,9 @@ setup_ubuntu_debian(){
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
 
+	setup_rsyslog_config 'www-data'
+	setup_logrotate_config 'www-data'
+
 	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 		print_status 'Installing UFW firewall...'
 		exec_cmd 'apt-get install -y ufw'
@@ -583,6 +620,9 @@ EOF
 	exec_cmd 'rm -r /var/www/simplerisk/database.sql'
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
+
+	setup_rsyslog_config 'apache'
+	setup_logrotate_config 'apache'
 
 	print_status 'Enabling and starting the Apache web server...'
 	exec_cmd 'systemctl enable httpd'
@@ -748,6 +788,9 @@ EOF
 
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
+
+	setup_rsyslog_config 'wwwrun'
+	setup_logrotate_config 'wwwrun'
 
 	if [[ "${VER}" = 15* ]]; then
 		print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
