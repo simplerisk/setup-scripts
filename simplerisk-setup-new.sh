@@ -196,8 +196,17 @@ download_and_run_os_installer() {
 	local installer_url="${SETUP_SCRIPTS_BASE_URL}/${installer_script}"
 	local temp_installer="/tmp/${installer_script}"
 
-	if ! curl -sL "${installer_url}" -o "${temp_installer}"; then
-		print_error_message "Failed to download ${installer_script} from ${installer_url}"
+	# Use --fail to make curl return error on HTTP errors (like 404)
+	# Use --location to follow redirects
+	# Use --silent to suppress progress bar
+	# Use --show-error to show errors even in silent mode
+	if ! curl --fail --location --silent --show-error "${installer_url}" -o "${temp_installer}"; then
+		print_error_message "Failed to download ${installer_script} from ${installer_url}. Please check that the script exists in the repository."
+	fi
+
+	# Verify the downloaded file is a bash script
+	if ! head -n 1 "${temp_installer}" | grep -q '^#!/'; then
+		print_error_message "Downloaded file does not appear to be a valid script. The URL may have returned an error page."
 	fi
 
 	# Make it executable
