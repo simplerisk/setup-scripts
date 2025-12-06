@@ -10,12 +10,78 @@ readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
 
 # Base URL for setup scripts
-readonly SETUP_SCRIPTS_BASE_URL='https://raw.githubusercontent.com/simplerisk/setup-scripts/master'
+readonly SETUP_SCRIPTS_BASE_URL='https://raw.githubusercontent.com/simplerisk/setup-scripts/main'
+
+#########################
+## DISPLAY FUNCTIONS   ##
+#########################
+display_banner() {
+	cat << 'EOF'
+
+
+
+
+
+
+                                         @@@%%%%%##%%%%%@@@
+                                      @@#:.-*##########*-.:#@@
+                                  @@#--+####################+--#@@
+                                @%+-*##########################*-+%@
+                              @%-=##########+.  -#################=-%@
+                             @+-############.   .*##################=+@
+                           @%:*#############:   .*###############+-:=+:%@
+                          @#:#############*.:-:==.-##########+::+******:#@
+                         @%:#############:    *=:  .######-.+**********#:#@
+                        @@:#############-     -::-.    .-+***************:%@
+                        @-+############-  .=  .. =#-.=*+*****************+-%
+                       @#:+###########+..:#+    ..=**********************#-#@
+                       @+*#+.=########*..:#+  .=:=************************++@
+                       @-*####+:-#######- .:-:.  .+************************-@
+                      @@-########+:-*##*--=-*=.   .************************:@@
+                      @@-*##########*.:+****+.-:   :***********************:@@
+                       @=*########*:=***-:=-. .*-   -**********************-@
+                       @*+######=:+*******=: .=**-  .*********************+*@
+                       @%-###*--*************+-=-*=. -*******************#:%@
+                        @+=*.+*******************+..  -******************==@
+                        @@-+************************=. .+****************-@@
+                         @%:***************************++:+*************:%@
+                          @@-+*****************************-:+********+-@@
+                            @=-*******************************=.=****-=@
+                             @#:+********************************=:-:#@
+                               @#:+******************************+:*@
+                                 @%:-**************************-:%@
+                                   @@#-:=******************+:-#%@
+                                      @@@#+=---======----+#%@@
+                                            @@@@@@@@@@@@
+
+
+
+
+
+          ######## ###                         ####         **********  **        ***
+          ###   ##         ##    ##       ###   ###    ###    **    **       ***  #***
+          #####   ################### ######### ###  #######  **    ****** *******#*** ***
+            ###### ### ###   ###   #######   ###### ######### ********  ** ***  # #******
+               ### ### ###   ###   ######    ###### ######### **  ***#  **  ******#******
+          ###  ### ### ###   ###   #######  ####### ####  ##  **   ***  ** **   **#*** ***
+           ######  #######   ###   ###########  ####  ######  **    ************* #***  ***#
+                                      ####
+                                       ##
+
+
+
+
+
+EOF
+}
 
 #########################
 ## MAIN FLOW FUNCTIONS ##
 #########################
 setup (){
+	# Display banner first
+	display_banner
+
 	validate_args "${@:1}"
 
 	# Check root unless you only want to validate if the script works on the host
@@ -281,16 +347,16 @@ Flags:
 
 Examples:
   Install latest version:
-    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
+    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -
 
   Install specific version:
-    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -s -- -v 20241201-001
+    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -s -- -v 20241201-001
 
   Install in headless mode with debug output:
-    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -s -- -n -d
+    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -s -- -n -d
 
   Validate OS compatibility only:
-    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -s -- --validate-os-only
+    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -s -- --validate-os-only
 EOC
 }
 
