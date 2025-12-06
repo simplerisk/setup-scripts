@@ -196,6 +196,17 @@ download_and_run_os_installer() {
 	local installer_url="${SETUP_SCRIPTS_BASE_URL}/${installer_script}"
 	local temp_installer="/tmp/${installer_script}"
 
+	# Remove any existing file at this location to prevent tampering
+	if [ -f "${temp_installer}" ]; then
+		print_status "Removing existing file at ${temp_installer}..."
+		rm -f "${temp_installer}"
+	fi
+
+	# Verify the file was successfully removed
+	if [ -f "${temp_installer}" ]; then
+		print_error_message "Failed to remove existing file at ${temp_installer}. Cannot proceed safely."
+	fi
+
 	# Use --fail to make curl return error on HTTP errors (like 404)
 	# Use --location to follow redirects
 	# Use --silent to suppress progress bar
@@ -204,8 +215,13 @@ download_and_run_os_installer() {
 		print_error_message "Failed to download ${installer_script} from ${installer_url}. Please check that the script exists in the repository."
 	fi
 
-	# Verify the downloaded file is a bash script
+	# Verify the downloaded file exists and is a bash script
+	if [ ! -f "${temp_installer}" ]; then
+		print_error_message "Downloaded file does not exist at ${temp_installer}."
+	fi
+
 	if ! head -n 1 "${temp_installer}" | grep -q '^#!/'; then
+		rm -f "${temp_installer}"
 		print_error_message "Downloaded file does not appear to be a valid script. The URL may have returned an error page."
 	fi
 
