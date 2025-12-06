@@ -257,10 +257,12 @@ setup_ubuntu_debian(){
 ## MAIN SCRIPT ##
 #################
 main() {
-	local current_simplerisk_version
-	current_simplerisk_version=$(get_current_simplerisk_version)
+	# SIMPLERISK_VERSION is passed from the main setup script
+	if [ -z "${SIMPLERISK_VERSION:-}" ]; then
+		print_error_message "SIMPLERISK_VERSION environment variable not set. This script should be called from the main setup script."
+	fi
 
-	setup_ubuntu_debian "$current_simplerisk_version"
+	setup_ubuntu_debian "$SIMPLERISK_VERSION"
 	success_final_message
 }
 

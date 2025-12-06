@@ -31,6 +31,14 @@ setup (){
 	if [ -v VALIDATE_ONLY ]; then
 		exit 0
 	fi
+
+	# Get SimpleRisk version (either specified or latest)
+	if [ -z "${SIMPLERISK_VERSION:-}" ]; then
+		print_status 'Determining latest SimpleRisk version...'
+		SIMPLERISK_VERSION=$(get_current_simplerisk_version)
+	fi
+	print_status "SimpleRisk version to install: ${SIMPLERISK_VERSION}"
+
 	download_and_run_os_installer
 }
 
@@ -48,6 +56,14 @@ validate_args(){
 			-t|--testing)
 				TESTING=y
 				shift;;
+			-v|--version)
+				if [[ -z "${2:-}" ]]; then
+					echo "Error: --version requires a version number argument"
+					print_help
+					exit 1
+				fi
+				SIMPLERISK_VERSION="${2}"
+				shift 2;;
 			--validate-os-only)
 				VALIDATE_ONLY=y
 				shift;;
@@ -161,6 +177,10 @@ validate_os_and_version(){
 	fi
 }
 
+get_current_simplerisk_version() {
+	curl -sL "https://updates${TESTING:+-test}.simplerisk.com/releases.xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2
+}
+
 download_and_run_os_installer() {
 	local installer_script
 	case "${SETUP_TYPE:-}" in
@@ -187,6 +207,7 @@ download_and_run_os_installer() {
 	export OS
 	export VER
 	export SETUP_TYPE
+	export SIMPLERISK_VERSION
 	export DEBUG
 	export TESTING
 	export HEADLESS
@@ -221,16 +242,30 @@ print_help() {
 
 Script to set up SimpleRisk on a server.
 
-./simplerisk-setup.sh [-d|--debug] [-n|--no-assistance] [-h|--help] [--validate-os-only]
+./simplerisk-setup.sh [-d|--debug] [-n|--no-assistance] [-v|--version VERSION] [-t|--testing] [-h|--help] [--validate-os-only]
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
 -n|--no-assistance:    Runs the script in headless mode (will assume yes on anything)
--t|--testing:          Picks the current testing version
+-v|--version VERSION:  Install a specific version of SimpleRisk (default: latest)
+-t|--testing:          Picks the current testing version from the testing channel
 --validate-os-only:    Only validates if the current host (OS and version) are supported
                          by the script. This option does not require running the script
                          as superuser.
 -h|--help:             Shows instructions on how to use this script
+
+Examples:
+  Install latest version:
+    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -
+
+  Install specific version:
+    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -s -- -v 20241201-001
+
+  Install in headless mode with debug output:
+    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -s -- -n -d
+
+  Validate OS compatibility only:
+    curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -s -- --validate-os-only
 EOC
 }
 

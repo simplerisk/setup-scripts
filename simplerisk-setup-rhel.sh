@@ -107,10 +107,6 @@ set_up_backup_cronjob() {
 	exec_cmd "(crontab -l 2>/dev/null; echo '* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php') | crontab -"
 }
 
-get_current_simplerisk_version() {
-	curl -sL "https://updates${TESTING:+-test}.simplerisk.com/releases.xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2
-}
-
 success_final_message(){
 	print_status 'Check /root/passwords.txt for the MySQL root and simplerisk passwords.'
 	print_status 'As these passwords are stored in clear text, we recommend immediately moving them into a password manager and deleting this file.'
@@ -281,10 +277,12 @@ EOF
 ## MAIN SCRIPT ##
 #################
 main() {
-	local current_simplerisk_version
-	current_simplerisk_version=$(get_current_simplerisk_version)
+	# SIMPLERISK_VERSION is passed from the main setup script
+	if [ -z "${SIMPLERISK_VERSION:-}" ]; then
+		print_error_message "SIMPLERISK_VERSION environment variable not set. This script should be called from the main setup script."
+	fi
 
-	setup_centos_rhel "$current_simplerisk_version"
+	setup_centos_rhel "$SIMPLERISK_VERSION"
 	success_final_message
 }
 
