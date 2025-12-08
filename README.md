@@ -14,8 +14,8 @@
 
 Run as root or insert `sudo -E` before `bash`:
 
-- `curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -`
-- `wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -`
+- `curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -`
+- `wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -`
 
 ## `--help`
 
