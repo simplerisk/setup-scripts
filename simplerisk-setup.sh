@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+# Detect piped execution (curl | bash) and force headless mode
+if ! [ -t 0 ]; then
+    HEADLESS=y
+fi
+
 readonly UBUNTU_OSVAR='Ubuntu'
 readonly DEBIAN_OSVAR='Debian GNU/Linux'
 readonly CENTOS_STREAM_OSVAR='CentOS Stream'
@@ -18,19 +23,21 @@ readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com
 setup (){
 	validate_args "${@:1}"
 
-	# Check root unless you only want to validate if the script works on the host
 	if [ ! -v VALIDATE_ONLY ]; then
 		check_root
 	fi
-	# Ask user input unless it is on headless mode or validating if the script works
+
 	if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
 		ask_user
 	fi
+
 	load_os_variables
 	validate_os_and_version
+
 	if [ -v VALIDATE_ONLY ]; then
 		exit 0
 	fi
+
 	perform_installation
 }
 
@@ -39,42 +46,37 @@ validate_args(){
 	do
 		local key="${1}"
 		case "${key}" in
-			-n|--no-assistance)
-				HEADLESS=y
-				shift;;
-			-d|--debug)
-				DEBUG=y
-				shift;;
-			-t|--testing)
-				TESTING=y
-				shift;;
-			--validate-os-only)
-				VALIDATE_ONLY=y
-				shift;;
-			-h|--help)
-				print_help
-				exit 0;;
-			*)    # unknown option
-				echo "Provided parameter ${key} is not valid."
-				print_help
-				exit 1;;
+			-n|--no-assistance) HEADLESS=y; shift;;
+			-d|--debug) DEBUG=y; shift;;
+			-t|--testing) TESTING=y; shift;;
+			--validate-os-only) VALIDATE_ONLY=y; shift;;
+			-h|--help) print_help; exit 0;;
+			*) echo "Provided parameter ${key} is not valid."; print_help; exit 1;;
 		esac
 	done
 }
 
 check_root() {
-	## Check to make sure we are running as root
 	if [ ${EUID} -ne 0 ]; then
-		print_error_message "This script must be run as root (unless for only verifying the OS). Try running the command 'sudo bash' and then run this script again."
+		print_error_message "This script must be run as root (unless verifying OS). Try: sudo bash"
 	fi
 }
 
-ask_user(){
-	read -r -p 'This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: ' answer < /dev/tty
-	case "${answer}" in
-		Yes|yes|Y|y ) ;;
-		* ) exit 1;;
-	esac
+ask_user() {
+	if ! [ -t 0 ]; then
+		if [ -v HEADLESS ]; then return 0
+		else print_error_message "No interactive terminal available. Re-run with --no-assistance."
+		fi
+	fi
+
+	while true; do
+		read -r -p 'This script will install SimpleRisk. Proceed? [Yes/No]: ' answer
+		case "${answer}" in
+			Yes|yes|Y|y ) return 0 ;;
+			No|no|N|n ) exit 1 ;;
+			* ) echo "Please answer Yes or No." ;;
+		esac
+	done
 }
 
 load_os_variables(){
@@ -132,20 +134,20 @@ validate_os_and_version(){
 				valid=y
 				SETUP_TYPE=rhel
 			fi;;
-		"${SLES_OSVAR}")
-			if [[ "${VER}" = 15* ]]; then
-				valid=y
-				if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
-					read -r -p 'Before continuing, SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails. Do you still want to proceed? [ Yes / No ]: ' answer < /dev/tty
-					case "${answer}" in
-						Yes|yes|Y|y ) SETUP_TYPE=suse;;
-						* ) exit 1;;
-					esac
-				else
-					echo "This will install postfix. You will need to configure it after the installation."
-					SETUP_TYPE=suse
-				fi
-			fi;;
+	"${SLES_OSVAR}")
+	if [[ "${VER}" = 15* ]]; then
+		valid=y
+		if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ] && [ -t 0 ]; then
+			read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [Yes/No]: ' answer
+			case "${answer}" in
+				Yes|yes|Y|y ) SETUP_TYPE=suse ;;
+				* ) exit 1 ;;
+			esac
+		else
+			echo "This will install postfix. You will need to configure it later."
+			SETUP_TYPE=suse
+		fi
+	fi;;
 		*)
 			local unknown=y;;
 	esac
@@ -607,52 +609,110 @@ EOF
 }
 
 setup_suse(){
-	print_status "Running SimpleRisk ${1} installer..."
 
-	print_status 'Populating zypper cache...'
-	exec_cmd 'zypper -n update'
+  print_status "Running SimpleRisk ${1} installer..."
+#!/usr/bin/env bash
 
-	if ! rpm -q mysql84-community-release; then
-		print_status 'Adding MySQL 8 repository...'
-		exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm'
-		exec_cmd "rpm --import $MYSQL_KEY_URL"
-	fi
+set -euo pipefail
 
-	print_status 'Installing Apache...'
-	exec_cmd 'zypper -n install apache2'
+# Detect SLES
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+else
+    echo "ERROR: /etc/os-release not found. Unable to determine OS."
+    exit 1
+fi
 
-	print_status 'Enabling Apache on reboot...'
-	exec_cmd 'systemctl enable apache2'
+if [[ "${ID,,}" != "sles" && "${ID_LIKE,,}" != *"suse"* ]]; then
+    echo "This system is not SLES. No subscription check required."
+    exit 0
+fi
 
-	print_status 'Starting Apache...'
-	exec_cmd 'systemctl start apache2'
+echo "SLES detected. Checking subscription status..."
 
-	print_status 'Installing MySQL 8...'
-	exec_cmd 'zypper -n install mysql-community-server'
+# Check for SUSEConnect
+#if ! command -v SUSEConnect &>/dev/null; then
+ #   echo "ERROR: SUSEConnect is not installed."
+ #   echo "This system cannot verify subscription status."
+  #  exit 1
+#fi
 
-	print_status 'Enabling MySQL on reboot...'
-	exec_cmd 'systemctl enable mysql'
+# Check SUSE subscription state
+#subscription_status="$(SUSEConnect --status 2>/dev/null || true)"
 
-	print_status 'Starting MySQL...'
-	exec_cmd 'systemctl start mysql'
+# Debug output can be enabled if needed
+# echo "$subscription_status"
 
-	print_status 'Installing PHP 8...'
-	exec_cmd 'zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php-xml'
-	exec_cmd 'a2enmod php8'
+#if echo "$subscription_status" | grep -qi "Not Registered"; then
+#    echo "ERROR: This system is NOT registered with SUSE."
+ #   echo
+  #  echo "Please register your system using:"
+   # echo "  SUSEConnect -r <registration_code>"
+    #exit 1
+#fi
 
-	print_status 'Enabling SSL for Apache...'
-	for module in rewrite ssl mod_ssl; do
-		exec_cmd "a2enmod $module"
-	done
+#if ! echo "$subscription_status" | grep -qi "Registered"; then
+ #   echo "ERROR: Unable to confirm that this system has an active SUSE subscription."
+  #  echo "Output from SUSEConnect:"
+   # echo "$subscription_status"
+    #exit 1
+#fi
 
-	print_status 'Enabling Rewrite Module for Apache...'
-	echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
+# Final verification via zypper (ensures repos are usable)
+#if ! zypper lr &>/dev/null; then
+  #  echo "ERROR: zypper cannot access repositories."
+   # echo "System may not have a valid or active SUSE subscription."
+    #exit 1
+#fi
 
-	print_status 'Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert'
-	echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf
-	cat << EOF >> /etc/apache2/vhosts.d/simplerisk.conf
-<VirtualHost *:80>
-	DocumentRoot "/var/www/simplerisk/"
+echo "SUCCESS: This SLES system has a valid subscription and working repositories."
+
+  print_status 'Populating zypper cache...'
+  exec_cmd 'zypper -n update'
+
+  if ! rpm -q mysql84-community-release; then
+    print_status 'Adding MySQL 8 repository...'
+    exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm'
+    exec_cmd "rpm --import $MYSQL_KEY_URL"
+  fi
+
+  print_status 'Installing Apache...'
+  exec_cmd 'zypper -n install apache2'
+
+  print_status 'Enabling Apache on reboot...'
+  exec_cmd 'systemctl enable apache2'
+
+  print_status 'Starting Apache...'
+  exec_cmd 'systemctl start apache2'
+
+  print_status 'Installing MySQL 8...'
+  exec_cmd 'zypper -n install mysql-community-server'
+
+  print_status 'Enabling MySQL on reboot...'
+  exec_cmd 'systemctl enable mysql'
+
+  print_status 'Starting MySQL...'
+  exec_cmd 'systemctl start mysql'
+
+  print_status 'Installing PHP 8...'
+  exec_cmd 'zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php-xml'
+
+  exec_cmd 'a2enmod php8'
+
+  print_status 'Enabling SSL for Apache...'
+  # Only enable valid modules on SLES
+  for module in rewrite ssl; do
+    exec_cmd "a2enmod $module"
+  done
+
+  print_status 'Enabling Rewrite Module for Apache...'
+  echo 'LoadModule rewrite_module /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
+
+  print_status 'Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert'
+  echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf
+
+  cat << EOF >> /etc/apache2/vhosts.d/simplerisk.conf
+DocumentRoot "/var/www/simplerisk/"
 	ErrorLog /var/log/apache2/error_log
 	CustomLog /var/log/apache2/access_log combined
 	<Directory "/var/www/simplerisk/">
@@ -665,28 +725,51 @@ setup_suse(){
 	RewriteEngine On
 	RewriteCond %{HTTPS} !=on
 	RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]
-</VirtualHost>
 EOF
 
-	generate_passwords
+  generate_passwords
 
-	# Generate the OpenSSL private key
-	exec_cmd 'openssl rand -hex 50 > /tmp/pass_openssl.txt'
-	exec_cmd 'openssl genrsa -des3 -passout file:/tmp/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key'
-	exec_cmd 'openssl rsa -passin file:/tmp/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key'
+ #!/bin/bash
 
-	# Remove the original key file
-	exec_cmd 'rm /etc/apache2/ssl.key/simplerisk.pass.key /tmp/pass_openssl.txt'
+# Where to store files
+KEY_DIR="/etc/apache2"
+mkdir -p "$KEY_DIR"
 
-	# Generate the CSR
-	exec_cmd 'openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out  /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk"'
+KEY_FILE="$KEY_DIR/ssl.key/server.key"
+CSR_FILE="$KEY_DIR/ssl.csr/server.csr"
+CRT_FILE="$KEY_DIR/ssl.crt/server.crt"
 
-	# Create the Certificate
-	exec_cmd 'openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt'
+mkdir -p "$(dirname "$KEY_FILE")" "$(dirname "$CSR_FILE")" "$(dirname "$CRT_FILE")"
 
-	cat << EOF >> /etc/apache2/vhosts.d/ssl.conf
-<VirtualHost *:443>
-	DocumentRoot "/var/www/simplerisk/"
+# Generate an RSA private key (works in OpenSSL 3 and FIPS)
+openssl genpkey \
+  -algorithm RSA \
+  -pkeyopt rsa_keygen_bits:2048 \
+  -out "$KEY_FILE"
+
+# Create a CSR
+openssl req \
+  -new \
+  -key "$KEY_FILE" \
+  -subj "/C=US/ST=None/L=None/O=Example/OU=IT/CN=localhost" \
+  -out "$CSR_FILE"
+
+# Create a self-signed certificate valid for 1 year
+openssl req \
+  -x509 \
+  -key "$KEY_FILE" \
+  -in "$CSR_FILE" \
+  -days 365 \
+  -out "$CRT_FILE"
+
+echo "Key:  $KEY_FILE"
+echo "CSR:  $CSR_FILE"
+echo "Cert: $CRT_FILE"
+
+
+
+  cat << EOF >> /etc/apache2/vhosts.d/ssl.conf
+DocumentRoot "/var/www/simplerisk/"
 	ErrorLog /var/log/apache2/error_log
 	CustomLog /var/log/apache2/access_log combined
 	<Directory "/var/www/simplerisk/">
@@ -697,56 +780,54 @@ EOF
 		Options SymLinksIfOwnerMatch
 	</Directory>
 	SSLEngine on
-	SSLCertificateFile /etc/apache2/ssl.crt/simplerisk.crt
-	SSLCertificateKeyFile /etc/apache2/ssl.key/simplerisk.key
-	#SSLCertificateChainFile /etc/apache2/ssl.crt/vhost-example-chain.crt
-</VirtualHost>
+	SSLCertificateFile      /etc/apache2/ssl.crt/server.crt
+	SSLCertificateKeyFile   /etc/apache2/ssl.key/server.key
 EOF
 
-	print_status 'Configuring secure settings for Apache...'
-	exec_cmd "sed -i 's/\(SSLProtocol\).*/\1 TLSv1.2/g' /etc/apache2/ssl-global.conf"
-	exec_cmd "sed -i 's/#\?\(SSLHonorCipherOrder\)/\1/g' /etc/apache2/ssl-global.conf"
-	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
-	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
+  print_status 'Configuring secure settings for Apache...'
+  exec_cmd "sed -i 's/\\(SSLProtocol\\).*/\\1 TLSv1.2/g' /etc/apache2/ssl-global.conf"
+  exec_cmd "sed -i 's/#\\?\\(SSLHonorCipherOrder\\)/\\1/g' /etc/apache2/ssl-global.conf"
 
-	set_php_settings /etc/php8/apache2/php.ini
+  set_php_settings /etc/php8/apache2/php.ini
 
-	print_status 'Specifying the MySQL socket path...'
-	for extension in mysqli pdo_mysql; do
-		exec_cmd "sed -i 's|\($extension.default_socket\).*|\1=/var/lib/mysql/mysql.sock|' /etc/php8/apache2/php.ini"
-	done
+  print_status 'Specifying the MySQL socket path...'
+  for extension in mysqli pdo_mysql; do
+    exec_cmd "sed -i 's|\\($extension.default_socket\\).*|\\1=/var/lib/mysql/mysql.sock|' /etc/php8/apache2/php.ini"
+  done
 
-	set_up_simplerisk 'wwwrun' "${1}"
+  set_up_simplerisk 'wwwrun' "${1}"
 
-	print_status 'Restarting Apache to load the new configuration...'
-	exec_cmd 'systemctl restart apache2'
+  print_status 'Restarting Apache to load the new configuration...'
+  exec_cmd 'systemctl restart apache2'
 
-	print_status 'Configuring MySQL...'
-	if [[ "${VER}" = 15* ]]; then
-		exec_cmd "sed -i 's/\(\[mysqld\]\)/\1\nsql_mode=NO_ENGINE_SUBSTITUTION/g' /etc/my.cnf"
-	fi
-	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
-	exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
+  print_status 'Configuring MySQL...'
+  if [[ "${VER}" = 15* ]]; then
+    exec_cmd "sed -i 's/\\(\\[mysqld\\]\\)/\\1\\nsql_mode=NO_ENGINE_SUBSTITUTION/g' /etc/my.cnf"
+  fi
 
-	if [[ "${VER}" = 15* ]]; then
-		set_up_database	/var/log/mysql/mysqld.log
-	else
-		set_up_database
-	fi
+  exec_cmd "sed -i '\$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
+  exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
 
-	print_status 'Restarting MySQL to load the new configuration...'
-	exec_cmd 'systemctl restart mysql'
+  if [[ "${VER}" = 15* ]]; then
+    set_up_database /var/log/mysql/mysqld.log
+  else
+    set_up_database
+  fi
 
-	print_status 'Removing the SimpleRisk database file...'
-	exec_cmd 'rm -r /var/www/simplerisk/database.sql'
+  print_status 'Restarting MySQL to load the new configuration...'
+  exec_cmd 'systemctl restart mysql'
 
-	print_status 'Setting up Backup cronjob...'
-	set_up_backup_cronjob
+  print_status 'Removing the SimpleRisk database file...'
+  exec_cmd 'rm -r /var/www/simplerisk/database.sql'
 
-	if [[ "${VER}" = 15* ]]; then
-		print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
-	fi
+  print_status 'Setting up Backup cronjob...'
+  set_up_backup_cronjob
+
+  if [[ "${VER}" = 15* ]]; then
+    print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
+  fi
 }
+
 
 ## Defer setup until we have the complete script
 setup "${@:1}"
