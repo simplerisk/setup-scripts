@@ -10,14 +10,12 @@ readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
 
 readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2023'
+readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html
 
 #########################
 ## MAIN FLOW FUNCTIONS ##
 #########################
 setup (){
-	# Display banner first
-	display_banner
-
 	validate_args "${@:1}"
 
 	# Check root unless you only want to validate if the script works on the host
@@ -120,7 +118,7 @@ validate_os_and_version(){
 				SETUP_TYPE=debian
 			fi;;
 		"${DEBIAN_OSVAR}")
-			if [ "${VER}" = "11" ] || [ "${VER}" = '12' ]; then
+			if [ "${VER}" = "11" ] || [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
@@ -332,28 +330,23 @@ setup_ubuntu_debian(){
 	print_status 'Populating apt-get cache...'
 	exec_cmd 'apt-get update'
 
-	# Add PHP8 for Ubuntu 20|Debian 11
-	if [ "${OS}" != "${UBUNTU_OSVAR}" ] || [[ "${VER}" = '20.04' ]]; then
+	# Add PHP8/MySQL repos for Debian
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 		exec_cmd 'mkdir -p /etc/apt/keyrings'
-		local apt_php_version=8.1
-		if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
-			print_status "Adding Ondrej's PPA with PHP8"
-			exec_cmd 'add-apt-repository -y ppa:ondrej/php'
-		else
-			print_status 'Install gnupg to handle keyrings...'
-			exec_cmd 'apt-get install -y gnupg'
+		local apt_php_version=8.5
 
-			print_status "Adding Ondrej's repository with PHP8"
-			exec_cmd 'wget -qO - https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /etc/apt/keyrings/sury-php.gpg'
-			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
-		fi
+		print_status 'Install gnupg to handle keyrings...'
+		exec_cmd 'apt-get install -y gnupg'
 
-		# Add MySQL 8 for Debian
-		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
-			print_status 'Adding MySQL 8 repository'
-			exec_cmd "wget -qO - $MYSQL_KEY_URL | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg"
-			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
-		fi
+		print_status "Adding Ondrej's repository with PHP8"
+		exec_cmd 'wget -qO - https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /etc/apt/keyrings/sury-php.gpg'
+		exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
+
+		print_status 'Adding MySQL 8 repository'
+		exec_cmd "export GNUPGHOME=\"$(mktemp -d)\""
+		exec_cmd "gpg --batch --keyserver keys.gnupg.net --recv-keys $MYSQL_GPG_KEY || gpg --batch --keyserver pgp.mit.edu --recv-keys $MYSQL_GPG_KEY" # Fallback server taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html, required for Debian 11
+		exec_cmd "gpg --batch --export $MYSQL_GPG_KEY | sudo tee /etc/apt/trusted.gpg.d/mysql.gpg >> /dev/null"
+		exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
 
 		print_status 'Re-populating apt-get cache with added repos...'
 		exec_cmd 'apt-get update'
@@ -362,7 +355,7 @@ setup_ubuntu_debian(){
 	print_status 'Updating current packages (this may take a bit)...'
 	exec_cmd 'apt-get dist-upgrade -qq --assume-yes'
 
-	if [ "${OS}" = "${UBUNTU_OSVAR}" ] && [[ "${VER}" != '20.04' ]]; then
+	if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		print_status 'Installing lamp-server...'
 		exec_cmd 'apt-get install -y lamp-server^'
 	else
@@ -375,9 +368,11 @@ setup_ubuntu_debian(){
 		print_status 'Installing PHP...'
 		exec_cmd "apt-get install -y php${apt_php_version:-} php${apt_php_version:-}-mysql libapache2-mod-php${apt_php_version:-}"
 
-		if [ "${OS}" = "${DEBIAN_OSVAR}" ] && [ "${VER}" = '12' ]; then
-			print_status 'Installing crontab for Debian 12'
-			exec_cmd 'apt-get install -y cron'
+		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+			if [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
+				print_status 'Installing crontab'
+				exec_cmd 'apt-get install -y cron'
+			fi
 		fi
 	fi
 
@@ -751,69 +746,6 @@ EOF
 	if [[ "${VER}" = 15* ]]; then
 		print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
 	fi
-}
-
-###################################
-## DISPLAY THE SIMPLERISK BANNER ##
-###################################
-display_banner() {
-	cat << 'EOF'
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                         @@@%%%%%##%%%%%@@@                                         
-                                      @@#:.-*##########*-.:#@@                                      
-                                  @@#--+####################+--#@@                                  
-                                @%+-*##########################*-+%@                                
-                              @%-=##########+.  -#################=-%@                              
-                             @+-############.   .*##################=+@                             
-                           @%:*#############:   .*###############+-:=+:%@                           
-                          @#:#############*.:-:==.-##########+::+******:#@                          
-                         @%:#############:    *=:  .######-.+**********#:#@                         
-                        @@:#############-     -::-.    .-+***************:%@                        
-                        @-+############-  .=  .. =#-.=*+*****************+-%                        
-                       @#:+###########+..:#+    ..=**********************#-#@                       
-                       @+*#+.=########*..:#+  .=:=************************++@                       
-                       @-*####+:-#######- .:-:.  .+************************-@                       
-                      @@-########+:-*##*--=-*=.   .************************:@@                      
-                      @@-*##########*.:+****+.-:   :***********************:@@                      
-                       @=*########*:=***-:=-. .*-   -**********************-@                       
-                       @*+######=:+*******=: .=**-  .*********************+*@                       
-                       @%-###*--*************+-=-*=. -*******************#:%@                       
-                        @+=*.+*******************+..  -******************==@                        
-                        @@-+************************=. .+****************-@@                        
-                         @%:***************************++:+*************:%@                         
-                          @@-+*****************************-:+********+-@@                          
-                            @=-*******************************=.=****-=@                            
-                             @#:+********************************=:-:#@                             
-                               @#:+******************************+:*@                               
-                                 @%:-**************************-:%@                                 
-                                   @@#-:=******************+:-#%@                                   
-                                      @@@#+=---======----+#%@@                                      
-                                            @@@@@@@@@@@@                                            
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-          ######## ###                         ####         **********  **        ***               
-          ###   ##         ##    ##       ###   ###    ###    **    **       ***  #***              
-          #####   ################### ######### ###  #######  **    ****** *******#*** ***          
-            ###### ### ###   ###   #######   ###### ######### ********  ** ***  # #******           
-               ### ### ###   ###   ######    ###### ######### **  ***#  **  ******#******           
-          ###  ### ### ###   ###   #######  ####### ####  ##  **   ***  ** **   **#*** ***          
-           ######  #######   ###   ###########  ####  ######  **    ************* #***  ***#        
-                                      ####                                                          
-                                       ##                                                           
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-EOF
 }
 
 ## Defer setup until we have the complete script

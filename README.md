@@ -5,7 +5,7 @@
 - Ubuntu LTS 22.04, and 24.04
   - Although it is possible to install on non-LTS versions in between the two most recent LTS versions or above the most
     recent version specified above, we do not support them officially
-- Debian 11, 12
+- Debian 11, 12, 13
 - CentOS Stream 9
 - Red Hat Enterprise Linux (RHEL) 8, 9
 - SUSE Linux Enterprise Server (SLES) higher than 15.5
@@ -14,8 +14,8 @@
 
 Run as root or insert `sudo -E` before `bash`:
 
-- `curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -`
-- `wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -`
+- `curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -`
+- `wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -`
 
 ## `--help`
 
