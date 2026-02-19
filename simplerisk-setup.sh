@@ -8,6 +8,7 @@ readonly CENTOS_STREAM_OSVAR='CentOS Stream'
 readonly RHEL_OSVAR='Red Hat Enterprise Linux'
 readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
+readonly SLES_15_SUPPORTED_SP="15.7"
 
 readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2025'
 readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html
@@ -65,12 +66,16 @@ validate_args(){
 check_root() {
 	## Check to make sure we are running as root
 	if [ ${EUID} -ne 0 ]; then
-		print_error_message "This script must be run as root (unless for only verifying the OS). Try running the command 'sudo bash' and then run this script again."
+		print_error_message "This script must be run as root (unless verifying OS). Try: sudo bash"
 	fi
 }
 
 ask_user(){
-	read -r -p 'This script will install SimpleRisk on this system.  Are you sure that you would like to proceed? [ Yes / No ]: ' answer < /dev/tty
+	if [ ! -t 0 ] && [ ! -v HEADLESS ]; then 
+		print_error_message "No interactive terminal available. Re-run with --yes."
+	fi
+
+	read -r -p 'This script will install SimpleRisk.  Proceed? [ Yes / (N)o ]: ' answer < /dev/tty
 	case "${answer}" in
 		Yes|yes|Y|y ) ;;
 		* ) exit 1;;
@@ -133,16 +138,22 @@ validate_os_and_version(){
 				SETUP_TYPE=rhel
 			fi;;
 		"${SLES_OSVAR}")
-			if [[ "${VER}" = 15* ]]; then
+			if [[ "${VER}" = "$SLES_15_SUPPORTED_SP" ]]; then
 				valid=y
+				local php_module
+				# Grab module where php8 is available
+				php_module=$(zypper search-packages php8 | awk '/^php8[[:space:]]/ { sub(/\(.*/, ""); sub(/^php8[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); print }')
+				if ! sudo suseconnect --list-extensions | grep -F "$php_module" | grep -q "Activated"; then
+					print_error_message "$php_module is not enabled on your subscription. Please enable it before running this installer."
+				fi
 				if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
-					read -r -p 'Before continuing, SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails. Do you still want to proceed? [ Yes / No ]: ' answer < /dev/tty
+					read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [ Yes / (No) ]: ' answer < /dev/tty
 					case "${answer}" in
 						Yes|yes|Y|y ) SETUP_TYPE=suse;;
 						* ) exit 1;;
 					esac
 				else
-					echo "This will install postfix. You will need to configure it after the installation."
+					echo "This will install postfix. You will need to configure it later."
 					SETUP_TYPE=suse
 				fi
 			fi;;
@@ -615,15 +626,18 @@ setup_suse(){
 
 	print_status 'Installing PHP 8...'
 	exec_cmd 'zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php-xml'
-	exec_cmd 'a2enmod php8'
 
-	print_status 'Enabling SSL for Apache...'
-	for module in rewrite ssl mod_ssl; do
-		exec_cmd "a2enmod $module"
-	done
+	if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
+		print_status 'Enabling PHP and Apache modules...'
+		for module in php8 rewrite ssl mod_ssl; do
+			exec_cmd "a2enmod $module"
+		done
+	fi
 
 	print_status 'Enabling Rewrite Module for Apache...'
-	echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
+	if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
+		echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
+	fi
 
 	print_status 'Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert'
 	echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf
