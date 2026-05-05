@@ -677,14 +677,14 @@ EOF
 
   generate_passwords
 
-	# Generate the OpenSSL private key (OpenSSL 3 / FIPS compatible)
-	exec_cmd 'openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /etc/apache2/ssl.key/simplerisk.key'
+  # Generate the OpenSSL private key (OpenSSL 3 / FIPS compatible)
+  exec_cmd 'openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /etc/apache2/ssl.key/simplerisk.key'
 
-	# Generate the CSR
-	exec_cmd 'openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk"'
+  # Generate the CSR
+  exec_cmd 'openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk"'
 
-	# Create the Certificate
-	exec_cmd 'openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt'
+  # Create the Certificate
+  exec_cmd 'openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt'
 
 
 
