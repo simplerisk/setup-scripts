@@ -135,19 +135,19 @@ validate_os_and_version(){
 				SETUP_TYPE=rhel
 			fi;;
 	"${SLES_OSVAR}")
-	if [[ "${VER}" = "$SLES_15_SUPPORTED_SP" ]]; then
-		valid=y
-		if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ] && [ -t 0 ]; then
-			read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [Yes/No]: ' answer
-			case "${answer}" in
-				Yes|yes|Y|y ) SETUP_TYPE=suse ;;
-				* ) exit 1 ;;
-			esac
-		else
-			echo "This will install postfix. You will need to configure it later."
-			SETUP_TYPE=suse
-		fi
-	fi;;
+		if [[ "${VER}" = "$SLES_15_SUPPORTED_SP" ]]; then
+			valid=y
+			if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ] && [ -t 0 ]; then
+				read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [Yes/No]: ' answer
+				case "${answer}" in
+					Yes|yes|Y|y ) SETUP_TYPE=suse ;;
+					* ) exit 1 ;;
+				esac
+			else
+				echo "This will install postfix. You will need to configure it later."
+				SETUP_TYPE=suse
+			fi
+		fi;;
 		*)
 			local unknown=y;;
 	esac
