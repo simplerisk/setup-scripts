@@ -13,6 +13,7 @@ readonly CENTOS_STREAM_OSVAR='CentOS Stream'
 readonly RHEL_OSVAR='Red Hat Enterprise Linux'
 readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
+readonly SLES_15_SUPPORTED_SP="15.7"
 
 readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2023'
 
@@ -803,18 +804,18 @@ EOF
   exec_cmd 'systemctl restart apache2'
 
   print_status 'Configuring MySQL...'
-  if [[ "${VER}" = 15* ]]; then
-    exec_cmd "sed -i 's/\\(\\[mysqld\\]\\)/\\1\\nsql_mode=NO_ENGINE_SUBSTITUTION/g' /etc/my.cnf"
-  fi
+	if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
+		exec_cmd "sed -i 's/\(\[mysqld\]\)/\1\nsql_mode=NO_ENGINE_SUBSTITUTION/g' /etc/my.cnf"
+	fi
 
   exec_cmd "sed -i '\$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
   exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
 
-  if [[ "${VER}" = 15* ]]; then
-    set_up_database /var/log/mysql/mysqld.log
-  else
-    set_up_database
-  fi
+	if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
+		set_up_database /var/log/mysql/mysqld.log
+	else
+		set_up_database
+	fi
 
   print_status 'Restarting MySQL to load the new configuration...'
   exec_cmd 'systemctl restart mysql'
@@ -825,9 +826,9 @@ EOF
   print_status 'Setting up Backup cronjob...'
   set_up_backup_cronjob
 
-  if [[ "${VER}" = 15* ]]; then
-    print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
-  fi
+	if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
+		print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
+	fi
 }
 
 
