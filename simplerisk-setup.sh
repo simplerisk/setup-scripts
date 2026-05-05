@@ -677,42 +677,14 @@ EOF
 
   generate_passwords
 
- #!/bin/bash
+	# Generate the OpenSSL private key (OpenSSL 3 / FIPS compatible)
+	exec_cmd 'openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /etc/apache2/ssl.key/simplerisk.key'
 
-# Where to store files
-KEY_DIR="/etc/apache2"
-mkdir -p "$KEY_DIR"
+	# Generate the CSR
+	exec_cmd 'openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk"'
 
-KEY_FILE="$KEY_DIR/ssl.key/server.key"
-CSR_FILE="$KEY_DIR/ssl.csr/server.csr"
-CRT_FILE="$KEY_DIR/ssl.crt/server.crt"
-
-mkdir -p "$(dirname "$KEY_FILE")" "$(dirname "$CSR_FILE")" "$(dirname "$CRT_FILE")"
-
-# Generate an RSA private key (works in OpenSSL 3 and FIPS)
-openssl genpkey \
-  -algorithm RSA \
-  -pkeyopt rsa_keygen_bits:2048 \
-  -out "$KEY_FILE"
-
-# Create a CSR
-openssl req \
-  -new \
-  -key "$KEY_FILE" \
-  -subj "/C=US/ST=None/L=None/O=Example/OU=IT/CN=localhost" \
-  -out "$CSR_FILE"
-
-# Create a self-signed certificate valid for 1 year
-openssl req \
-  -x509 \
-  -key "$KEY_FILE" \
-  -in "$CSR_FILE" \
-  -days 365 \
-  -out "$CRT_FILE"
-
-echo "Key:  $KEY_FILE"
-echo "CSR:  $CSR_FILE"
-echo "Cert: $CRT_FILE"
+	# Create the Certificate
+	exec_cmd 'openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt'
 
 
 
@@ -728,8 +700,8 @@ DocumentRoot "/var/www/simplerisk/"
 		Options SymLinksIfOwnerMatch
 	</Directory>
 	SSLEngine on
-	SSLCertificateFile      /etc/apache2/ssl.crt/server.crt
-	SSLCertificateKeyFile   /etc/apache2/ssl.key/server.key
+	SSLCertificateFile      /etc/apache2/ssl.crt/simplerisk.crt
+	SSLCertificateKeyFile   /etc/apache2/ssl.key/simplerisk.key
 EOF
 
   print_status 'Configuring secure settings for Apache...'
