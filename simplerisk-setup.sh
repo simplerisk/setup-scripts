@@ -134,7 +134,7 @@ validate_os_and_version(){
 				valid=y
 				SETUP_TYPE=rhel
 			fi;;
-	"${SLES_OSVAR}")
+		"${SLES_OSVAR}")
 		if [[ "${VER}" = "$SLES_15_SUPPORTED_SP" ]]; then
 			valid=y
 			if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ] && [ -t 0 ]; then
