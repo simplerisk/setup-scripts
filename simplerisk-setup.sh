@@ -45,7 +45,7 @@ validate_args(){
 	do
 		local key="${1}"
 		case "${key}" in
-			-n|--no-assistance) HEADLESS=y; shift;;
+			--yes) HEADLESS=y; shift;;
 			-d|--debug) DEBUG=y; shift;;
 			-t|--testing) TESTING=y; shift;;
 			--validate-os-only) VALIDATE_ONLY=y; shift;;
@@ -64,7 +64,7 @@ check_root() {
 ask_user() {
 	if ! [ -t 0 ]; then
 		if [ -v HEADLESS ]; then return 0
-		else print_error_message "No interactive terminal available. Re-run with --no-assistance."
+		else print_error_message "No interactive terminal available. Re-run with --yes."
 		fi
 	fi
 
@@ -302,11 +302,11 @@ print_help() {
 
 Script to set up SimpleRisk on a server.
 
-./simplerisk-setup [-d|--debug] [-n|--no-assistance] [-h|--help] [--validate-os-only]
+./simplerisk-setup [-d|--debug] [--yes] [-h|--help] [--validate-os-only]
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
--n|--no-assistance:    Runs the script in headless mode (will assume yes on anything)
+--yes:                 Runs the script in headless mode (will assume yes on anything)
 -t|--testing:          Picks the current testing version
 --validate-os-only:    Only validates if the current host (OS and version) are supported
                          by the script. This option does not require running the script
