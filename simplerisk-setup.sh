@@ -660,7 +660,8 @@ setup_suse(){
   echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf
 
   cat << EOF >> /etc/apache2/vhosts.d/simplerisk.conf
-DocumentRoot "/var/www/simplerisk/"
+<VirtualHost *:80>
+	DocumentRoot "/var/www/simplerisk/"
 	ErrorLog /var/log/apache2/error_log
 	CustomLog /var/log/apache2/access_log combined
 	<Directory "/var/www/simplerisk/">
@@ -673,6 +674,7 @@ DocumentRoot "/var/www/simplerisk/"
 	RewriteEngine On
 	RewriteCond %{HTTPS} !=on
 	RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]
+</VirtualHost>
 EOF
 
   generate_passwords
@@ -689,7 +691,8 @@ EOF
 
 
   cat << EOF >> /etc/apache2/vhosts.d/ssl.conf
-DocumentRoot "/var/www/simplerisk/"
+<VirtualHost *:443>
+	DocumentRoot "/var/www/simplerisk/"
 	ErrorLog /var/log/apache2/error_log
 	CustomLog /var/log/apache2/access_log combined
 	<Directory "/var/www/simplerisk/">
@@ -700,8 +703,10 @@ DocumentRoot "/var/www/simplerisk/"
 		Options SymLinksIfOwnerMatch
 	</Directory>
 	SSLEngine on
-	SSLCertificateFile      /etc/apache2/ssl.crt/simplerisk.crt
-	SSLCertificateKeyFile   /etc/apache2/ssl.key/simplerisk.key
+	SSLCertificateFile /etc/apache2/ssl.crt/simplerisk.crt
+	SSLCertificateKeyFile /etc/apache2/ssl.key/simplerisk.key
+	#SSLCertificateChainFile /etc/apache2/ssl.crt/vhost-example-chain.crt
+</VirtualHost>
 EOF
 
   print_status 'Configuring secure settings for Apache...'
