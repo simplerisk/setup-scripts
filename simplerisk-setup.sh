@@ -15,7 +15,8 @@ readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
 readonly SLES_15_SUPPORTED_SP="15.7"
 
-readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2023'
+readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2025'
+readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html
 
 #########################
 ## MAIN FLOW FUNCTIONS ##
@@ -120,34 +121,40 @@ validate_os_and_version(){
 				SETUP_TYPE=debian
 			fi;;
 		"${DEBIAN_OSVAR}")
-			if [ "${VER}" = "11" ] || [ "${VER}" = '12' ]; then
+			if [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
 		"${CENTOS_STREAM_OSVAR}")
-			if [ "${VER}" = "9" ]; then
+			if [ "${VER}" = "9" ] || [ "${VER}" = "10" ]; then
 				valid=y
 				SETUP_TYPE=rhel
 			fi;;
 		"${RHEL_OSVAR}"|"${RHELS_OSVAR}")
-			if [[ "${VER}" = 8* ]] || [[ "${VER}" = 9* ]]; then
+			if [[ "${VER}" = 9* ]] || [[ "${VER}" = 10* ]]; then
 				valid=y
 				SETUP_TYPE=rhel
 			fi;;
 		"${SLES_OSVAR}")
-		if [[ "${VER}" = "$SLES_15_SUPPORTED_SP" ]]; then
-			valid=y
-			if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ] && [ -t 0 ]; then
-				read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [Yes/No]: ' answer
-				case "${answer}" in
-					Yes|yes|Y|y ) SETUP_TYPE=suse ;;
-					* ) exit 1 ;;
-				esac
-			else
-				echo "This will install postfix. You will need to configure it later."
-				SETUP_TYPE=suse
-			fi
-		fi;;
+			if [[ "${VER}" = "$SLES_15_SUPPORTED_SP" ]]; then
+				valid=y
+				local php_module
+				# Grab module where php8 is available
+				php_module=$(zypper search-packages php8 | awk '/^php8[[:space:]]/ { sub(/\(.*/, ""); sub(/^php8[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); print }')
+				if ! sudo suseconnect --list-extensions | grep -F "$php_module" | grep -q "Activated"; then
+					print_error_message "$php_module is not enabled on your subscription. Please enable it before running this installer."
+				fi
+				if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ] && [ -t 0 ]; then
+					read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [Yes/No]: ' answer
+					case "${answer}" in
+						Yes|yes|Y|y ) SETUP_TYPE=suse ;;
+						* ) exit 1 ;;
+					esac
+				else
+					echo "This will install postfix. You will need to configure it later."
+					SETUP_TYPE=suse
+				fi
+			fi;;
 		*)
 			local unknown=y;;
 	esac
@@ -245,7 +252,7 @@ generate_passwords() {
 
 set_up_database() {
 	# $1 should receive the mysqld.log path to retrieve password:
-	# CentOS 7, RHEL 9: /var/log/mysqld.log
+	# RHEL 9, 10: /var/log/mysqld.log
 	# SLES 15:  /var/log/mysql/mysqld.log
 	local password_flag
 	if [ -n "${1:-}" ]; then
@@ -329,6 +336,7 @@ Flags:
 --validate-os-only:    Only validates if the current host (OS and version) are supported
                          by the script. This option does not require running the script
 			 as superuser.
+--yes:                 Will answer yes on every question (Use it carefully)
 -h|--help:             Shows instructions on how to use this script
 EOC
 }
@@ -349,28 +357,23 @@ setup_ubuntu_debian(){
 	print_status 'Populating apt-get cache...'
 	exec_cmd 'apt-get update'
 
-	# Add PHP8 for Ubuntu 20|Debian 11
-	if [ "${OS}" != "${UBUNTU_OSVAR}" ] || [[ "${VER}" = '20.04' ]]; then
+	# Add PHP8/MySQL repos for Debian
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 		exec_cmd 'mkdir -p /etc/apt/keyrings'
-		local apt_php_version=8.1
-		if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
-			print_status "Adding Ondrej's PPA with PHP8"
-			exec_cmd 'add-apt-repository -y ppa:ondrej/php'
-		else
-			print_status 'Install gnupg to handle keyrings...'
-			exec_cmd 'apt-get install -y gnupg'
+		local apt_php_version=8.5
 
-			print_status "Adding Ondrej's repository with PHP8"
-			exec_cmd 'wget -qO - https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /etc/apt/keyrings/sury-php.gpg'
-			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
-		fi
+		print_status 'Install gnupg to handle keyrings...'
+		exec_cmd 'apt-get install -y gnupg'
 
-		# Add MySQL 8 for Debian
-		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
-			print_status 'Adding MySQL 8 repository'
-			exec_cmd "wget -qO - $MYSQL_KEY_URL | gpg --dearmor -o /etc/apt/keyrings/mysql.gpg"
-			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
-		fi
+		print_status "Adding Ondrej's repository with PHP8"
+		exec_cmd 'wget -qO - https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /etc/apt/keyrings/sury-php.gpg'
+		exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
+
+		print_status 'Adding MySQL 8 repository'
+		exec_cmd "export GNUPGHOME=\"$(mktemp -d)\""
+		exec_cmd "gpg --batch --keyserver keys.gnupg.net --recv-keys $MYSQL_GPG_KEY || gpg --batch --keyserver pgp.mit.edu --recv-keys $MYSQL_GPG_KEY" # Fallback server taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html 
+		exec_cmd "gpg --batch --export $MYSQL_GPG_KEY | sudo tee /etc/apt/trusted.gpg.d/mysql.gpg >> /dev/null"
+		exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
 
 		print_status 'Re-populating apt-get cache with added repos...'
 		exec_cmd 'apt-get update'
@@ -379,7 +382,7 @@ setup_ubuntu_debian(){
 	print_status 'Updating current packages (this may take a bit)...'
 	exec_cmd 'apt-get dist-upgrade -qq --assume-yes'
 
-	if [ "${OS}" = "${UBUNTU_OSVAR}" ] && [[ "${VER}" != '20.04' ]]; then
+	if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		print_status 'Installing lamp-server...'
 		exec_cmd 'apt-get install -y lamp-server^'
 	else
@@ -392,9 +395,11 @@ setup_ubuntu_debian(){
 		print_status 'Installing PHP...'
 		exec_cmd "apt-get install -y php${apt_php_version:-} php${apt_php_version:-}-mysql libapache2-mod-php${apt_php_version:-}"
 
-		if [ "${OS}" = "${DEBIAN_OSVAR}" ] && [ "${VER}" = '12' ]; then
-			print_status 'Installing crontab for Debian 12'
-			exec_cmd 'apt-get install -y cron'
+		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+			if [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
+				print_status 'Installing crontab'
+				exec_cmd 'apt-get install -y cron'
+			fi
 		fi
 	fi
 
@@ -477,74 +482,63 @@ setup_ubuntu_debian(){
 
 setup_centos_rhel(){
 	print_status "Running SimpleRisk ${1} installer..."
+	local major_version="${VER%%.*}"
 
-	# If OS is CentOS, use yum. Else (RHEL or CentOS Stream), use dnf.
-	[ "${OS}" = 'CentOS Linux' ] && pkg_manager='yum' || pkg_manager='dnf'
-
-	print_status "Updating packages with $pkg_manager. This may take some time."
-	exec_cmd "$pkg_manager -y update"
+	print_status "Updating packages. This may take some time."
+	exec_cmd "dnf -y update"
 
 	print_status 'Installing the wget package...'
-	exec_cmd "$pkg_manager -y install wget"
+	exec_cmd "dnf -y install wget"
 
 	print_status 'Installing Firewalld...'
-	exec_cmd "$pkg_manager -y install firewalld"
+	exec_cmd "dnf -y install firewalld"
 
 	print_status 'Enabling MySQL 8 repositories...'
+	exec_cmd "rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-el${major_version}-2.noarch.rpm"
 	exec_cmd "rpm --import $MYSQL_KEY_URL"
-	case ${VER:0:1} in
-		8) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-el8-1.noarch.rpm';;
-		9) exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-el9-1.noarch.rpm';;
-	esac
 
 	print_status 'Enabling PHP 8 repositories...'
-	exec_cmd "$pkg_manager -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${VER:0:1}.noarch.rpm"
-	case ${VER:0:1} in
+	exec_cmd "dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${major_version}.noarch.rpm"
+	case $major_version in
 		8) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2018";;
 		9) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2021";;
+		10) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2025";;
 	esac
-	exec_cmd "$pkg_manager -y install https://rpms.remirepo.net/enterprise/remi-release-${VER:0:1}.rpm"
-	exec_cmd "$pkg_manager -y update"
+	exec_cmd "dnf -y install https://rpms.remirepo.net/enterprise/remi-release-${major_version}.rpm"
+	exec_cmd "dnf -y update"
 
 
 	print_status 'Installing PHP for Apache...'
-	if [ "${OS}" = 'CentOS Linux' ]; then
-		exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php81 install httpd php php-common"
-		exec_cmd "$pkg_manager -y --enablerepo=remi,remi-php81 install php-cli php-pdo php-mysqlnd php-gd php-zip php-mbstring php-xml php-curl php-ldap php-json php-intl php-posix"
-	else
-		exec_cmd "$pkg_manager -y module reset php"
-		exec_cmd "$pkg_manager -y module enable php:remi-8.1"
-		exec_cmd "$pkg_manager -y install httpd php php-common php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
-	fi
+	exec_cmd "dnf -y module reset php"
+	exec_cmd "dnf -y module enable php:remi-8.5"
+	exec_cmd "dnf -y install httpd php php-common php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
 
 	set_php_settings /etc/php.ini
 
 	print_status 'Installing the MySQL database server...'
-	exec_cmd "$pkg_manager install -y mysql-server"
+	exec_cmd "dnf install -y mysql-community-server --exclude mariadb*"
 
 	print_status 'Enabling and starting MySQL database server...'
 	exec_cmd 'systemctl enable mysqld'
 	exec_cmd 'systemctl start mysqld'
 
 	if [[ "${VER}" = 8* ]]; then
-		exec_cmd "$pkg_manager clean all"
+		exec_cmd "dnf clean all"
 		exec_cmd 'rm -rf /var/cache/dnf/remi-*a'
-		exec_cmd "$pkg_manager -y update"
+		exec_cmd "dnf -y update"
 	fi
 
 	print_status 'Installing mod_ssl'
-	exec_cmd "$pkg_manager -y install mod_ssl"
+	exec_cmd "dnf -y install mod_ssl"
 
 	print_status 'Installing sendmail'
-	exec_cmd "$pkg_manager -y install sendmail sendmail-cf m4"
+	exec_cmd "dnf -y install sendmail sendmail-cf m4"
 
 	set_up_simplerisk 'apache' "${1}"
 
 	print_status 'Configuring Apache...'
-	if [[ "${OS}" != 'CentOS Linux' ]]; then
-		exec_cmd "sed -i 's|#\?\(DocumentRoot \"/var/www/\)html\"|\1simplerisk\"|' /etc/httpd/conf.d/ssl.conf"
-		exec_cmd 'rm /etc/httpd/conf.d/welcome.conf'
-	fi
+	exec_cmd "sed -i 's|#\?\(DocumentRoot \"/var/www/\)html\"|\1simplerisk\"|' /etc/httpd/conf.d/ssl.conf"
+	exec_cmd 'mv /etc/httpd/conf.d/welcome.conf{,.disabled}'
 	exec_cmd 'mkdir /etc/httpd/sites-{available,enabled}'
 	exec_cmd "sed -i 's|\(DocumentRoot \"/var/www\).*|\1\"|g' /etc/httpd/conf/httpd.conf"
 	echo 'IncludeOptional sites-enabled/*.conf' >> /etc/httpd/conf/httpd.conf
@@ -567,25 +561,13 @@ EOF
 	if ! grep -q 'AllowOverride all' /etc/httpd/conf.d/ssl.conf; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
 	fi
-	if [ "${OS}" = 'CentOS Linux' ]; then
-		exec_cmd "sed -i '/<VirtualHost _default_:443>/a \\\t\tDocumentRoot \"/var/www/simplerisk\"' /etc/httpd/conf.d/ssl.conf"
-	else
-		exec_cmd "sed -i 's/#\(LoadModule mpm_prefork\)/\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
-		exec_cmd "sed -i 's/\(LoadModule mpm_event\)/#\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
-	fi
+	exec_cmd "sed -i 's/#\(LoadModule mpm_prefork\)/\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
+	exec_cmd "sed -i 's/\(LoadModule mpm_event\)/#\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
 
 	generate_passwords
 
 	print_status 'Configuring MySQL...'
-	if [ "${OS}" = 'CentOS Linux' ]; then
-		set_up_database	/var/log/mysqld.log
-	else
-		if [[ "${VER}" = 9* ]]; then
-			set_up_database	/var/log/mysqld.log
-		else
-			set_up_database
-		fi
-	fi
+	set_up_database	/var/log/mysqld.log
 
 	cat << EOF >> /etc/my.cnf
 [mysqld]
@@ -662,16 +644,17 @@ setup_suse(){
   print_status 'Installing PHP 8...'
   exec_cmd 'zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php-xml'
 
-  exec_cmd 'a2enmod php8'
-
-  print_status 'Enabling SSL for Apache...'
-  # Only enable valid modules on SLES
-  for module in rewrite ssl; do
-    exec_cmd "a2enmod $module"
-  done
+  if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
+    print_status 'Enabling PHP and Apache modules...'
+    for module in php8 rewrite ssl mod_ssl; do
+      exec_cmd "a2enmod $module"
+    done
+  fi
 
   print_status 'Enabling Rewrite Module for Apache...'
-  echo 'LoadModule rewrite_module /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
+  if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
+    echo 'LoadModule rewrite_module /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
+  fi
 
   print_status 'Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert'
   echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf
