@@ -448,7 +448,7 @@ setup_ubuntu_debian(){
 	print_status 'Configuring Sendmail...'
 	exec_cmd "echo '127.0.0.1 $(hostname)' >> /etc/hosts"
 	exec_cmd 'yes | sendmailconfig'
-	exec_cmd 'service sendmail start'
+	exec_cmd 'service sendmail restart'
 
 	print_status 'Restarting Apache to load the new configuration...'
 	exec_cmd 'service apache2 restart'
