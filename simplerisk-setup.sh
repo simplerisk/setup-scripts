@@ -464,10 +464,8 @@ setup_ubuntu_debian(){
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
 
-	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
-		print_status 'Installing UFW firewall...'
-		exec_cmd 'apt-get install -y ufw'
-	fi
+	print_status 'Installing UFW firewall...'
+	exec_cmd 'apt-get install -y ufw'
 
 	print_status 'Enabling UFW firewall...'
 	exec_cmd 'ufw allow ssh'
