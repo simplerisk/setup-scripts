@@ -446,7 +446,7 @@ setup_ubuntu_debian(){
 	fi
 
 	print_status 'Configuring Sendmail...'
-	exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+	exec_cmd "echo '127.0.0.1 $(hostname)' >> /etc/hosts"
 	exec_cmd 'yes | sendmailconfig'
 	exec_cmd 'service sendmail start'
 
@@ -587,7 +587,7 @@ EOF
 	exec_cmd 'systemctl start httpd'
 
 	print_status 'Configuring and starting Sendmail...'
-	exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+	exec_cmd "echo '127.0.0.1 $(hostname)' >> /etc/hosts"
 	exec_cmd 'systemctl start sendmail'
 
 	print_status 'Opening Firewall for HTTP/HTTPS traffic'
