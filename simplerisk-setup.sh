@@ -394,10 +394,10 @@ setup_ubuntu_debian(){
 
 		print_status 'Installing PHP...'
 		exec_cmd "apt-get install -y php${apt_php_version:-} php${apt_php_version:-}-mysql libapache2-mod-php${apt_php_version:-}"
-
-		print_status 'Installing crontab...'
-		exec_cmd 'apt-get install -y cron'
 	fi
+
+	print_status 'Installing crontab...'
+	exec_cmd 'apt-get install -y cron'
 
 	print_status 'Installing PHP development libraries...'
 	exec_cmd "apt-get install -y php${apt_php_version:-}-dev"
