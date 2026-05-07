@@ -395,12 +395,8 @@ setup_ubuntu_debian(){
 		print_status 'Installing PHP...'
 		exec_cmd "apt-get install -y php${apt_php_version:-} php${apt_php_version:-}-mysql libapache2-mod-php${apt_php_version:-}"
 
-		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
-			if [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
-				print_status 'Installing crontab'
-				exec_cmd 'apt-get install -y cron'
-			fi
-		fi
+		print_status 'Installing crontab...'
+		exec_cmd 'apt-get install -y cron'
 	fi
 
 	print_status 'Installing PHP development libraries...'
@@ -531,8 +527,8 @@ setup_centos_rhel(){
 	print_status 'Installing mod_ssl'
 	exec_cmd "dnf -y install mod_ssl"
 
-	print_status 'Installing sendmail'
-	exec_cmd "dnf -y install sendmail sendmail-cf m4"
+	print_status 'Installing sendmail and cron...'
+	exec_cmd "dnf -y install sendmail sendmail-cf m4 cronie"
 
 	set_up_simplerisk 'apache' "${1}"
 
