@@ -370,9 +370,7 @@ setup_ubuntu_debian(){
 		exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
 
 		print_status 'Adding MySQL 8 repository'
-		exec_cmd "export GNUPGHOME=\"$(mktemp -d)\""
-		exec_cmd "gpg --batch --keyserver keys.gnupg.net --recv-keys $MYSQL_GPG_KEY || gpg --batch --keyserver pgp.mit.edu --recv-keys $MYSQL_GPG_KEY" # Fallback server taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html 
-		exec_cmd "gpg --batch --export $MYSQL_GPG_KEY | sudo tee /etc/apt/trusted.gpg.d/mysql.gpg >> /dev/null"
+		exec_cmd "curl -fsSL $MYSQL_KEY_URL | gpg --dearmor | tee /etc/apt/trusted.gpg.d/mysql.gpg > /dev/null"
 		exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
 
 		print_status 'Re-populating apt-get cache with added repos...'
