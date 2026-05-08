@@ -1,2 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Enforce LF line endings for files that run inside Linux containers or are
+# parsed by tools that are sensitive to CRLF (Docker, bash, etc.).
+*.sh        text eol=lf
+Dockerfile* text eol=lf
+*.yml       text eol=lf

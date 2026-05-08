@@ -39,45 +39,36 @@ jobs:
             -t simplerisk-test:${{ matrix.os-slug }} \
             tests/dockerfiles/
 
-      # ── Start — Debian/Ubuntu (no systemd needed) ───────────────────────────
-      - name: Start container (Debian/Ubuntu)
-        if: ${{ !startsWith(matrix.os-slug, 'centos') }}
+      # ── Start container ─────────────────────────────────────────────────────
+      # All OSes use --init (tini as PID 1) so that child processes (Apache
+      # workers, mysqld) are properly reaped and multiple rapid service
+      # start/stop/restart calls during apt/dnf post-install triggers work
+      # correctly.  CentOS/RHEL uses the /usr/local/bin/systemctl shim baked
+      # into the image; no real systemd is needed.
+      # --privileged is required for ufw/iptables inside Debian/Ubuntu and
+      # is harmless for CentOS.
+      - name: Start container
         run: |
           docker run -d \
             --name simplerisk-test-${{ matrix.os-slug }} \
             --privileged \
+            --init \
             simplerisk-test:${{ matrix.os-slug }} \
             /bin/bash -c "tail -f /dev/null"
+          sleep 2
 
-      # ── Start — CentOS/RHEL (systemd as PID 1) ─────────────────────────────
-      - name: Start container (CentOS/RHEL — systemd)
-        if: ${{ startsWith(matrix.os-slug, 'centos') }}
+      # ── Pre-start services (Ubuntu only) ────────────────────────────────────
+      # Ubuntu images pre-install lamp-server^ during the Docker build (with
+      # policy-rc.d blocking auto-start).  Start MySQL and Apache now so that
+      # the setup script finds them in the expected running state — mirroring
+      # what would happen on a freshly provisioned real server where the
+      # package post-install scripts start the services.
+      - name: Start pre-installed services (Ubuntu only)
+        if: ${{ startsWith(matrix.os-slug, 'ubuntu') }}
         run: |
-          docker run -d \
-            --name simplerisk-test-${{ matrix.os-slug }} \
-            --privileged \
-            --cgroupns=host \
-            --tmpfs /run \
-            --tmpfs /run/lock \
-            simplerisk-test:${{ matrix.os-slug }}
-
-      - name: Wait for systemd (CentOS/RHEL only)
-        if: ${{ startsWith(matrix.os-slug, 'centos') }}
-        run: |
-          CONTAINER="simplerisk-test-${{ matrix.os-slug }}"
-          echo "Waiting for systemd multi-user.target..."
-          for i in $(seq 1 30); do
-            if docker exec "$CONTAINER" systemctl is-active --quiet multi-user.target 2>/dev/null; then
-              echo "systemd ready."
-              break
-            fi
-            sleep 3
-            if [ "$i" -eq 30 ]; then
-              echo "ERROR: systemd did not reach multi-user.target within 90s"
-              docker exec "$CONTAINER" journalctl -n 100 2>/dev/null || true
-              exit 1
-            fi
-          done
+          docker exec simplerisk-test-${{ matrix.os-slug }} service mysql  start 2>/dev/null || true
+          docker exec simplerisk-test-${{ matrix.os-slug }} service apache2 start 2>/dev/null || true
+          sleep 2
 
       # ── Copy files ──────────────────────────────────────────────────────────
       - name: Copy scripts into container
