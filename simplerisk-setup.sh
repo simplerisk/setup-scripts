@@ -627,13 +627,18 @@ EOF
 	print_status 'Configuring MySQL...'
 	set_up_database	/var/log/mysqld.log
 
-	cat << EOF >> /etc/my.cnf
-[mysqld]
-sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
-EOF
+	# Write sql_mode to a dedicated drop-in file so it is read last (alphabetically
+	# "zz-") and is not overridden by any vendor-supplied file in /etc/my.cnf.d/.
+	# The same setting is applied via SET GLOBAL after the restart as a safety net
+	# for MySQL 8.4+ where config-file precedence changed.
+	printf '[mysqld]\nsql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION\n' \
+		> /etc/my.cnf.d/zz-simplerisk.cnf
 
 	print_status 'Restarting MySQL to load the new configuration...'
 	exec_cmd 'systemctl restart mysqld'
+	exec_cmd "mysql -uroot -p\"${NEW_MYSQL_ROOT_PASSWORD}\" \
+		-e \"SET GLOBAL sql_mode='ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';\" \
+		2>/dev/null"
 
 	print_status 'Removing the SimpleRisk database file...'
 	exec_cmd 'rm -r /var/www/simplerisk/database.sql'

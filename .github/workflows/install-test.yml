@@ -111,14 +111,23 @@ jobs:
         if: failure()
         run: |
           CONTAINER="simplerisk-test-${{ matrix.os-slug }}"
-          echo "=== journalctl (last 100 lines) ===" && \
-            docker exec "$CONTAINER" journalctl -n 100 2>/dev/null || true
+          echo "=== /etc/my.cnf ===" && \
+            docker exec "$CONTAINER" cat /etc/my.cnf 2>/dev/null || true
+          echo "=== /etc/my.cnf.d/ ===" && \
+            docker exec "$CONTAINER" ls -la /etc/my.cnf.d/ 2>/dev/null || true
+          echo "=== /etc/my.cnf.d/* contents ===" && \
+            docker exec "$CONTAINER" sh -c 'for f in /etc/my.cnf.d/*.cnf; do echo "--- $f ---"; cat "$f"; done' 2>/dev/null || true
+          echo "=== MySQL sql_mode ===" && \
+            docker exec "$CONTAINER" sh -c \
+              'PW=$(grep "MYSQL ROOT PASSWORD:" /root/passwords.txt 2>/dev/null | cut -d" " -f4); mysql -uroot -p"$PW" -e "SELECT @@sql_mode;" 2>/dev/null' || true
+          echo "=== journalctl (last 50 lines) ===" && \
+            docker exec "$CONTAINER" journalctl -n 50 2>/dev/null || true
           echo "=== Apache error log ===" && \
             docker exec "$CONTAINER" cat /var/log/apache2/error.log 2>/dev/null || \
             docker exec "$CONTAINER" cat /var/log/httpd/error_log 2>/dev/null || true
-          echo "=== MySQL error log ===" && \
-            docker exec "$CONTAINER" cat /var/log/mysql/error.log 2>/dev/null || \
-            docker exec "$CONTAINER" cat /var/log/mysqld.log 2>/dev/null || true
+          echo "=== MySQL error log (last 30 lines) ===" && \
+            docker exec "$CONTAINER" tail -30 /var/log/mysql/error.log 2>/dev/null || \
+            docker exec "$CONTAINER" tail -30 /var/log/mysqld.log 2>/dev/null || true
           echo "=== /root/passwords.txt ===" && \
             docker exec "$CONTAINER" cat /root/passwords.txt 2>/dev/null || true
 
