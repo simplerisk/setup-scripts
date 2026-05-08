@@ -839,9 +839,9 @@ uninstall_ubuntu_debian(){
 	exec_cmd_nobail 'rm -rf /var/www/simplerisk'
 
 	print_status 'Removing installed packages...'
-	exec_cmd "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin"
-	exec_cmd 'apt-get autoremove -y'
-	exec_cmd 'apt-get autoclean'
+	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin"
+	exec_cmd_nobail 'apt-get autoremove -y'
+	exec_cmd_nobail 'apt-get autoclean'
 
 	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 		print_status 'Removing added repositories and keys...'
@@ -884,8 +884,8 @@ uninstall_centos_rhel(){
 	exec_cmd_nobail 'mv /etc/httpd/conf.d/welcome.conf.disabled /etc/httpd/conf.d/welcome.conf 2>/dev/null || true'
 
 	print_status 'Removing installed packages...'
-	exec_cmd "dnf -y remove httpd mod_ssl 'php*' mysql-community-server mysql-community-client sendmail sendmail-cf m4"
-	exec_cmd 'dnf -y autoremove'
+	exec_cmd_nobail "dnf -y remove httpd mod_ssl 'php*' mysql-community-server mysql-community-client sendmail sendmail-cf m4"
+	exec_cmd_nobail 'dnf -y autoremove'
 
 	print_status 'Removing MySQL and PHP repositories...'
 	local major_version="${VER%%.*}"
@@ -928,8 +928,8 @@ uninstall_suse(){
 	exec_cmd_nobail "sed -i '/LoadModule rewrite_module.*mod_rewrite.so/d' /etc/apache2/loadmodule.conf"
 
 	print_status 'Removing installed packages...'
-	exec_cmd "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
-	exec_cmd 'zypper -n autoremove'
+	exec_cmd_nobail "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
+	exec_cmd_nobail 'zypper -n autoremove'
 
 	print_status 'Removing MySQL repository...'
 	exec_cmd_nobail 'rpm -e mysql84-community-release-sl15 2>/dev/null || true'
