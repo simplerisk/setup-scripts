@@ -25,14 +25,22 @@ setup (){
 	fi
 	# Ask user input unless it is on headless mode or validating if the script works
 	if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
-		ask_user
+		if [ -v UNINSTALL ]; then
+			ask_user_uninstall
+		else
+			ask_user
+		fi
 	fi
 	load_os_variables
 	validate_os_and_version
 	if [ -v VALIDATE_ONLY ]; then
 		exit 0
 	fi
-	perform_installation
+	if [ -v UNINSTALL ]; then
+		perform_uninstallation
+	else
+		perform_installation
+	fi
 }
 
 validate_args(){
@@ -51,6 +59,9 @@ validate_args(){
 				shift;;
 			--validate-os-only)
 				VALIDATE_ONLY=y
+				shift;;
+			--uninstall)
+				UNINSTALL=y
 				shift;;
 			-h|--help)
 				print_help
@@ -71,11 +82,23 @@ check_root() {
 }
 
 ask_user(){
-	if [ ! -t 0 ] && [ ! -v HEADLESS ]; then 
+	if [ ! -t 0 ] && [ ! -v HEADLESS ]; then
 		print_error_message "No interactive terminal available. Re-run with --yes."
 	fi
 
 	read -r -p 'This script will install SimpleRisk.  Proceed? [ Yes / (N)o ]: ' answer < /dev/tty
+	case "${answer}" in
+		Yes|yes|Y|y ) ;;
+		* ) exit 1;;
+	esac
+}
+
+ask_user_uninstall(){
+	if [ ! -t 0 ] && [ ! -v HEADLESS ]; then
+		print_error_message "No interactive terminal available. Re-run with --yes."
+	fi
+
+	read -r -p 'This script will UNINSTALL SimpleRisk and remove all associated packages, files, and data. This action is IRREVERSIBLE. Proceed? [ Yes / (N)o ]: ' answer < /dev/tty
 	case "${answer}" in
 		Yes|yes|Y|y ) ;;
 		* ) exit 1;;
@@ -184,6 +207,17 @@ perform_installation() {
 	esac
 
 	success_final_message
+}
+
+perform_uninstallation() {
+	case "${SETUP_TYPE:-}" in
+		debian) uninstall_ubuntu_debian;;
+		rhel) uninstall_centos_rhel;;
+		suse) uninstall_suse;;
+		*) print_error_message "Could not validate the setup type. Check the perform_uninstallation and validate_os_and_version functions.";;
+	esac
+
+	uninstall_final_message
 }
 
 #########################
@@ -307,12 +341,18 @@ success_final_message(){
 	print_status 'INSTALLATION COMPLETED SUCCESSFULLY'
 }
 
+uninstall_final_message(){
+	print_status 'UNINSTALLATION COMPLETED SUCCESSFULLY'
+	print_status 'SimpleRisk and its associated components have been removed from this system.'
+	print_status 'Note: Base packages (wget, gnupg, cron, etc.) that were present before installation may remain on the system.'
+}
+
 print_help() {
         cat << EOC
 
-Script to set up SimpleRisk on a server.
+Script to set up or uninstall SimpleRisk on a server.
 
-./simplerisk-setup [-d|--debug] [--yes] [-h|--help] [--validate-os-only]
+./simplerisk-setup [-d|--debug] [--yes] [-h|--help] [--validate-os-only] [--uninstall]
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
@@ -320,6 +360,9 @@ Flags:
 --validate-os-only:    Only validates if the current host (OS and version) are supported
                          by the script. This option does not require running the script
 			 as superuser.
+--uninstall:           Removes SimpleRisk and all associated packages, services, and data
+                         (Apache/httpd, MySQL, PHP, sendmail/postfix, firewall rules).
+                         WARNING: This action is irreversible and will destroy all SimpleRisk data.
 --yes:                 Will answer yes on every question (Use it carefully)
 -h|--help:             Shows instructions on how to use this script
 EOC
@@ -327,6 +370,29 @@ EOC
 
 bail() {
 	print_error_message 'The command exited with failure. Verify the command output or run the script in debug mode (-d|--debug).'
+}
+
+remove_backup_cronjob() {
+	(crontab -l 2>/dev/null | grep -v 'simplerisk/cron/cron.php') | crontab - 2>/dev/null || true
+}
+
+get_mysql_root_password() {
+	if [ -f /root/passwords.txt ]; then
+		grep 'MYSQL ROOT PASSWORD:' /root/passwords.txt | awk -F ': ' '{print $2}'
+	fi
+}
+
+drop_simplerisk_database() {
+	local root_password
+	root_password=$(get_mysql_root_password)
+	if [ -n "${root_password}" ]; then
+		exec_cmd_nobail "mysql -uroot --password='${root_password}' -e \"DROP DATABASE IF EXISTS simplerisk\""
+		exec_cmd_nobail "mysql -uroot --password='${root_password}' -e \"DROP USER IF EXISTS 'simplerisk'@'localhost'\""
+		exec_cmd_nobail "mysql -uroot --password='${root_password}' -e \"FLUSH PRIVILEGES\""
+	else
+		print_status 'WARNING: Could not find MySQL root password in /root/passwords.txt. Skipping database removal.'
+		print_status 'You may need to manually drop the simplerisk database and user.'
+	fi
 }
 
 ########################
@@ -354,9 +420,8 @@ setup_ubuntu_debian(){
 		exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
 
 		print_status 'Adding MySQL 8 repository'
-		exec_cmd "export GNUPGHOME=\"$(mktemp -d)\""
-		exec_cmd "gpg --batch --keyserver keys.gnupg.net --recv-keys $MYSQL_GPG_KEY || gpg --batch --keyserver pgp.mit.edu --recv-keys $MYSQL_GPG_KEY" # Fallback server taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html 
-		exec_cmd "gpg --batch --export $MYSQL_GPG_KEY | sudo tee /etc/apt/trusted.gpg.d/mysql.gpg >> /dev/null"
+		# Download the signing key directly from MySQL (more reliable than keyservers).
+		exec_cmd "curl -fsSL '$MYSQL_KEY_URL' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mysql.gpg"
 		exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
 
 		print_status 'Re-populating apt-get cache with added repos...'
@@ -369,6 +434,8 @@ setup_ubuntu_debian(){
 	if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		print_status 'Installing lamp-server...'
 		exec_cmd 'apt-get install -y lamp-server^'
+		print_status 'Installing cron...'
+		exec_cmd 'apt-get install -y cron'
 	else
 		print_status 'Installing Apache...'
 		exec_cmd 'apt-get install -y apache2'
@@ -430,14 +497,19 @@ setup_ubuntu_debian(){
 	fi
 
 	print_status 'Configuring Sendmail...'
-	exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+	# /etc/hosts may be a bind-mount (e.g. Docker) and cannot be renamed by
+	# `sed -i`.  Write to a temp file then overwrite the original in place.
+	exec_cmd "sed 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts > /tmp/hosts.bak && cat /tmp/hosts.bak > /etc/hosts && rm -f /tmp/hosts.bak"
 	exec_cmd 'yes | sendmailconfig'
-	exec_cmd 'service sendmail start'
+	exec_cmd 'service sendmail restart'
 
 	print_status 'Restarting Apache to load the new configuration...'
 	exec_cmd 'service apache2 restart'
 
 	generate_passwords
+
+	print_status 'Ensuring MySQL database server is running...'
+	exec_cmd 'service mysql status > /dev/null 2>&1 || service mysql start'
 
 	print_status 'Configuring MySQL...'
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
@@ -452,10 +524,8 @@ setup_ubuntu_debian(){
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
 
-	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
-		print_status 'Installing UFW firewall...'
-		exec_cmd 'apt-get install -y ufw'
-	fi
+	print_status 'Installing UFW firewall...'
+	exec_cmd 'apt-get install -y ufw'
 
 	print_status 'Enabling UFW firewall...'
 	exec_cmd 'ufw allow ssh'
@@ -495,12 +565,16 @@ setup_centos_rhel(){
 	print_status 'Installing PHP for Apache...'
 	exec_cmd "dnf -y module reset php"
 	exec_cmd "dnf -y module enable php:remi-8.5"
-	exec_cmd "dnf -y install httpd php php-common php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
+	exec_cmd "dnf -y install httpd php php-cli php-common php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
 
 	set_php_settings /etc/php.ini
 
 	print_status 'Installing the MySQL database server...'
-	exec_cmd "dnf install -y mysql-community-server --exclude mariadb*"
+	# On CentOS/RHEL 10, AppStream ships mysql8.4-server which conflicts with
+	# mysql-community-server (same files).  Exclude it explicitly so DNF does
+	# not pull it in as a weak dependency.  The exclude is a no-op on el9/el8
+	# where mysql8.4-server does not exist in any enabled repo.
+	exec_cmd "dnf install -y mysql-community-server --exclude 'mariadb*' --exclude 'mysql8.4*'"
 
 	print_status 'Enabling and starting MySQL database server...'
 	exec_cmd 'systemctl enable mysqld'
@@ -571,7 +645,7 @@ EOF
 	exec_cmd 'systemctl start httpd'
 
 	print_status 'Configuring and starting Sendmail...'
-	exec_cmd "sed -i 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts"
+	exec_cmd "sed 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts > /tmp/hosts.bak && cat /tmp/hosts.bak > /etc/hosts && rm -f /tmp/hosts.bak"
 	exec_cmd 'systemctl start sendmail'
 
 	print_status 'Opening Firewall for HTTP/HTTPS traffic'
@@ -737,6 +811,126 @@ EOF
 	if [[ "${VER}" = 15* ]]; then
 		print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
 	fi
+}
+
+###########################
+## OS UNINSTALL FUNCTIONS ##
+###########################
+uninstall_ubuntu_debian(){
+	export DEBIAN_FRONTEND=noninteractive
+
+	print_status 'Removing SimpleRisk cron job...'
+	remove_backup_cronjob
+
+	print_status 'Dropping SimpleRisk database and user...'
+	drop_simplerisk_database
+
+	print_status 'Stopping services...'
+	exec_cmd_nobail 'service apache2 stop'
+	exec_cmd_nobail 'service mysql stop'
+	exec_cmd_nobail 'service sendmail stop'
+
+	print_status 'Removing SimpleRisk application files...'
+	exec_cmd_nobail 'rm -rf /var/www/simplerisk'
+
+	print_status 'Removing installed packages...'
+	exec_cmd "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin"
+	exec_cmd 'apt-get autoremove -y'
+	exec_cmd 'apt-get autoclean'
+
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+		print_status 'Removing added repositories and keys...'
+		exec_cmd_nobail 'rm -f /etc/apt/sources.list.d/sury-php.list'
+		exec_cmd_nobail 'rm -f /etc/apt/sources.list.d/mysql.list'
+		exec_cmd_nobail 'rm -f /etc/apt/keyrings/sury-php.gpg'
+		exec_cmd_nobail 'rm -f /etc/apt/trusted.gpg.d/mysql.gpg'
+		exec_cmd_nobail 'apt-get update'
+	fi
+
+	print_status 'Removing UFW firewall rules for SimpleRisk...'
+	exec_cmd_nobail 'ufw delete allow http'
+	exec_cmd_nobail 'ufw delete allow https'
+
+	print_status 'Removing MySQL password file...'
+	exec_cmd_nobail 'rm -f /root/passwords.txt'
+}
+
+uninstall_centos_rhel(){
+	print_status 'Removing SimpleRisk cron job...'
+	remove_backup_cronjob
+
+	print_status 'Dropping SimpleRisk database and user...'
+	drop_simplerisk_database
+
+	print_status 'Stopping and disabling services...'
+	exec_cmd_nobail 'systemctl stop httpd'
+	exec_cmd_nobail 'systemctl disable httpd'
+	exec_cmd_nobail 'systemctl stop mysqld'
+	exec_cmd_nobail 'systemctl disable mysqld'
+	exec_cmd_nobail 'systemctl stop sendmail'
+
+	print_status 'Removing SimpleRisk application files...'
+	exec_cmd_nobail 'rm -rf /var/www/simplerisk'
+
+	print_status 'Removing SimpleRisk Apache virtual host config...'
+	exec_cmd_nobail 'rm -f /etc/httpd/sites-enabled/simplerisk.conf'
+	exec_cmd_nobail 'rm -rf /etc/httpd/sites-available /etc/httpd/sites-enabled'
+	exec_cmd_nobail "sed -i '/IncludeOptional sites-enabled\/\*.conf/d' /etc/httpd/conf/httpd.conf"
+	exec_cmd_nobail 'mv /etc/httpd/conf.d/welcome.conf.disabled /etc/httpd/conf.d/welcome.conf 2>/dev/null || true'
+
+	print_status 'Removing installed packages...'
+	exec_cmd "dnf -y remove httpd mod_ssl 'php*' mysql-community-server mysql-community-client sendmail sendmail-cf m4"
+	exec_cmd 'dnf -y autoremove'
+
+	print_status 'Removing MySQL and PHP repositories...'
+	local major_version="${VER%%.*}"
+	exec_cmd_nobail "rpm -e mysql84-community-release-el${major_version} 2>/dev/null || true"
+	exec_cmd_nobail "dnf -y remove epel-release"
+	exec_cmd_nobail "rpm -e remi-release-${major_version} 2>/dev/null || true"
+	exec_cmd_nobail "dnf clean all"
+
+	print_status 'Removing firewall rules for SimpleRisk...'
+	exec_cmd_nobail 'firewall-cmd --permanent --zone=public --remove-service=http'
+	exec_cmd_nobail 'firewall-cmd --permanent --zone=public --remove-service=https'
+	exec_cmd_nobail 'firewall-cmd --reload'
+
+	print_status 'Removing MySQL password file...'
+	exec_cmd_nobail 'rm -f /root/passwords.txt'
+}
+
+uninstall_suse(){
+	print_status 'Removing SimpleRisk cron job...'
+	remove_backup_cronjob
+
+	print_status 'Dropping SimpleRisk database and user...'
+	drop_simplerisk_database
+
+	print_status 'Stopping and disabling services...'
+	exec_cmd_nobail 'systemctl stop apache2'
+	exec_cmd_nobail 'systemctl disable apache2'
+	exec_cmd_nobail 'systemctl stop mysql'
+	exec_cmd_nobail 'systemctl disable mysql'
+
+	print_status 'Removing SimpleRisk application files...'
+	exec_cmd_nobail 'rm -rf /var/www/simplerisk'
+
+	print_status 'Removing SimpleRisk Apache virtual host and SSL config...'
+	exec_cmd_nobail 'rm -f /etc/apache2/vhosts.d/simplerisk.conf'
+	exec_cmd_nobail 'rm -f /etc/apache2/vhosts.d/ssl.conf'
+	exec_cmd_nobail 'rm -f /etc/apache2/ssl.key/simplerisk.key'
+	exec_cmd_nobail 'rm -f /etc/apache2/ssl.csr/simplerisk.csr'
+	exec_cmd_nobail 'rm -f /etc/apache2/ssl.crt/simplerisk.crt'
+	exec_cmd_nobail "sed -i '/LoadModule rewrite_module.*mod_rewrite.so/d' /etc/apache2/loadmodule.conf"
+
+	print_status 'Removing installed packages...'
+	exec_cmd "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
+	exec_cmd 'zypper -n autoremove'
+
+	print_status 'Removing MySQL repository...'
+	exec_cmd_nobail 'rpm -e mysql84-community-release-sl15 2>/dev/null || true'
+
+	print_status 'Removing MySQL password file...'
+	exec_cmd_nobail 'rm -f /root/passwords.txt'
 }
 
 ## Defer setup until we have the complete script

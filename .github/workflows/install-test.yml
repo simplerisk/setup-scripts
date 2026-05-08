@@ -1,0 +1,138 @@
+name: SimpleRisk Install/Uninstall Tests
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: "Test: ${{ matrix.os-slug }}"
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Run all matrix jobs even if one fails so we get a full picture
+      fail-fast: false
+      matrix:
+        os-slug:
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - debian-12
+          - debian-13
+          - centos-stream-9
+          - centos-stream-10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Build ───────────────────────────────────────────────────────────────
+      - name: Build test image
+        run: |
+          docker build \
+            -f tests/dockerfiles/Dockerfile.${{ matrix.os-slug }} \
+            -t simplerisk-test:${{ matrix.os-slug }} \
+            tests/dockerfiles/
+
+      # ── Start — Debian/Ubuntu (no systemd needed) ───────────────────────────
+      - name: Start container (Debian/Ubuntu)
+        if: ${{ !startsWith(matrix.os-slug, 'centos') }}
+        run: |
+          docker run -d \
+            --name simplerisk-test-${{ matrix.os-slug }} \
+            --privileged \
+            simplerisk-test:${{ matrix.os-slug }} \
+            /bin/bash -c "tail -f /dev/null"
+
+      # ── Start — CentOS/RHEL (systemd as PID 1) ─────────────────────────────
+      - name: Start container (CentOS/RHEL — systemd)
+        if: ${{ startsWith(matrix.os-slug, 'centos') }}
+        run: |
+          docker run -d \
+            --name simplerisk-test-${{ matrix.os-slug }} \
+            --privileged \
+            --cgroupns=host \
+            --tmpfs /run \
+            --tmpfs /run/lock \
+            simplerisk-test:${{ matrix.os-slug }}
+
+      - name: Wait for systemd (CentOS/RHEL only)
+        if: ${{ startsWith(matrix.os-slug, 'centos') }}
+        run: |
+          CONTAINER="simplerisk-test-${{ matrix.os-slug }}"
+          echo "Waiting for systemd multi-user.target..."
+          for i in $(seq 1 30); do
+            if docker exec "$CONTAINER" systemctl is-active --quiet multi-user.target 2>/dev/null; then
+              echo "systemd ready."
+              break
+            fi
+            sleep 3
+            if [ "$i" -eq 30 ]; then
+              echo "ERROR: systemd did not reach multi-user.target within 90s"
+              docker exec "$CONTAINER" journalctl -n 100 2>/dev/null || true
+              exit 1
+            fi
+          done
+
+      # ── Copy files ──────────────────────────────────────────────────────────
+      - name: Copy scripts into container
+        run: |
+          CONTAINER="simplerisk-test-${{ matrix.os-slug }}"
+          docker cp simplerisk-setup.sh          "$CONTAINER:/root/simplerisk-setup.sh"
+          docker cp tests/verify-install.sh      "$CONTAINER:/root/verify-install.sh"
+          docker cp tests/verify-uninstall.sh    "$CONTAINER:/root/verify-uninstall.sh"
+          docker exec "$CONTAINER" chmod +x \
+            /root/simplerisk-setup.sh \
+            /root/verify-install.sh \
+            /root/verify-uninstall.sh
+
+      # ── Install ─────────────────────────────────────────────────────────────
+      - name: Run install
+        run: |
+          docker exec simplerisk-test-${{ matrix.os-slug }} \
+            bash /root/simplerisk-setup.sh --yes --debug
+
+      # ── Verify install ──────────────────────────────────────────────────────
+      - name: Verify installation
+        run: |
+          docker exec simplerisk-test-${{ matrix.os-slug }} \
+            bash /root/verify-install.sh
+
+      # ── Uninstall ───────────────────────────────────────────────────────────
+      - name: Run uninstall
+        run: |
+          docker exec simplerisk-test-${{ matrix.os-slug }} \
+            bash /root/simplerisk-setup.sh --uninstall --yes --debug
+
+      # ── Verify uninstall ────────────────────────────────────────────────────
+      - name: Verify uninstallation
+        run: |
+          docker exec simplerisk-test-${{ matrix.os-slug }} \
+            bash /root/verify-uninstall.sh
+
+      # ── Diagnostics on failure ──────────────────────────────────────────────
+      - name: Collect diagnostics on failure
+        if: failure()
+        run: |
+          CONTAINER="simplerisk-test-${{ matrix.os-slug }}"
+          echo "=== journalctl (last 100 lines) ===" && \
+            docker exec "$CONTAINER" journalctl -n 100 2>/dev/null || true
+          echo "=== Apache error log ===" && \
+            docker exec "$CONTAINER" cat /var/log/apache2/error.log 2>/dev/null || \
+            docker exec "$CONTAINER" cat /var/log/httpd/error_log 2>/dev/null || true
+          echo "=== MySQL error log ===" && \
+            docker exec "$CONTAINER" cat /var/log/mysql/error.log 2>/dev/null || \
+            docker exec "$CONTAINER" cat /var/log/mysqld.log 2>/dev/null || true
+          echo "=== /root/passwords.txt ===" && \
+            docker exec "$CONTAINER" cat /root/passwords.txt 2>/dev/null || true
+
+      # ── Teardown ────────────────────────────────────────────────────────────
+      - name: Teardown container
+        if: always()
+        run: |
+          docker rm -f simplerisk-test-${{ matrix.os-slug }} 2>/dev/null || true

@@ -1,0 +1,35 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV container=docker
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        sudo \
+        curl \
+        wget \
+        lsb-release \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# MySQL uses native AIO by default, which fails on Docker's overlayfs storage
+# driver during the post-install data directory initialisation.
+RUN mkdir -p /etc/mysql/conf.d && \
+    printf '[mysqld]\ninnodb_use_native_aio=0\n' > /etc/mysql/conf.d/docker.cnf
+
+# DENY all service operations during the lamp-server^ pre-install below.
+# MySQL's post-install shutdown times out inside Docker; denying start/stop
+# lets dpkg initialise the data directory without triggering the timeout.
+RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && \
+    chmod +x /usr/sbin/policy-rc.d
+
+# Pre-install lamp-server^ so packages are already present for the test run.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y lamp-server^ && \
+    rm -rf /var/lib/apt/lists/*
+
+# Switch back to ALLOW so the setup script can start/stop services normally.
+RUN printf '#!/bin/sh\nexit 0\n' > /usr/sbin/policy-rc.d && \
+    chmod +x /usr/sbin/policy-rc.d
+
+CMD ["/bin/bash"]

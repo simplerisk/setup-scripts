@@ -8,7 +8,7 @@
 - Debian 12, 13
 - CentOS Stream 9, 10
 - Red Hat Enterprise Linux (RHEL) 9, 10
-- SUSE Linux Enterprise Server (SLES) higher than 15.5
+- SUSE Linux Enterprise Server (SLES) 15.7 or higher
 
 ## Instructions
 
@@ -20,14 +20,16 @@ Run as root or insert `sudo -E` before `bash`:
 ## `--help`
 
 ```
-Script to set up SimpleRisk on a server.
+Script to set up or uninstall SimpleRisk on a server.
 
-./simplerisk-setup [-d|--debug] [-n|--no-assistance] [-h|--help] [--validate-os-only]
+./simplerisk-setup [-d|--debug] [--yes] [-h|--help] [--validate-os-only] [--uninstall]
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
--n|--no-assistance:    Runs the script in headless mode (will assume yes on anything)
 -t|--testing:          Picks the current testing version
 --validate-os-only:    Only validates if the current host (OS and version) are supported by the script. This option does not require running the script as superuser.
+--uninstall:           Removes SimpleRisk and all associated packages, services, and data
+                       WARNING: This action is irreversible and will destroy all SimpleRisk data.
+--yes:                 Will answer yes on every question (Use it carefully)
 -h|--help:             Shows instructions on how to use this script
 ```
