@@ -574,7 +574,9 @@ setup_centos_rhel(){
 	# mysql-community-server (same files).  Exclude it explicitly so DNF does
 	# not pull it in as a weak dependency.  The exclude is a no-op on el9/el8
 	# where mysql8.4-server does not exist in any enabled repo.
-	exec_cmd "dnf install -y mysql-community-server --exclude 'mariadb*' --exclude 'mysql8.4*'"
+	# The mysql84-community-release RPM also enables a mysql-9.x-lts-community
+	# repo; disable it so DNF resolves mysql-community-server from 8.4, not 9.x.
+	exec_cmd "dnf install -y mysql-community-server --exclude 'mariadb*' --exclude 'mysql8.4*' --disablerepo='mysql-9*'"
 
 	print_status 'Enabling and starting MySQL database server...'
 	exec_cmd 'systemctl enable mysqld'
