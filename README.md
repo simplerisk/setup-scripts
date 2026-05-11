@@ -22,12 +22,10 @@ Run as root or insert `sudo -E` before `bash`:
 ```
 Script to set up SimpleRisk on a server.
 
-./simplerisk-setup [-d|--debug] [-n|--no-assistance] [-h|--help] [--validate-os-only]
+./simplerisk-setup [-d|--debug] [-n|--no-assistance] [-h|--help]
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
 -n|--no-assistance:    Runs the script in headless mode (will assume yes on anything)
--t|--testing:          Picks the current testing version
---validate-os-only:    Only validates if the current host (OS and version) are supported by the script. This option does not require running the script as superuser.
 -h|--help:             Shows instructions on how to use this script
 ```
