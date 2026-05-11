@@ -19,19 +19,12 @@ readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com
 setup (){
 	validate_args "${@:1}"
 
-	# Check root unless you only want to validate if the script works on the host
-	if [ ! -v VALIDATE_ONLY ]; then
-		check_root
-	fi
-	# Ask user input unless it is on headless mode or validating if the script works
-	if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
+	check_root
+	if [ ! -v HEADLESS ]; then
 		ask_user
 	fi
 	load_os_variables
 	validate_os_and_version
-	if [ -v VALIDATE_ONLY ]; then
-		exit 0
-	fi
 	perform_installation
 }
 
@@ -49,10 +42,7 @@ validate_args(){
 			-t|--testing)
 				TESTING=y
 				shift;;
-			--validate-os-only)
-				VALIDATE_ONLY=y
-				shift;;
-			-h|--help)
+-h|--help)
 				print_help
 				exit 0;;
 			*)    # unknown option
@@ -146,7 +136,7 @@ validate_os_and_version(){
 				if ! sudo suseconnect --list-extensions | grep -F "$php_module" | grep -q "Activated"; then
 					print_error_message "$php_module is not enabled on your subscription. Please enable it before running this installer."
 				fi
-				if [ ! -v HEADLESS ] && [ ! -v VALIDATE_ONLY ]; then
+				if [ ! -v HEADLESS ]; then
 					read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [ Yes / (No) ]: ' answer < /dev/tty
 					case "${answer}" in
 						Yes|yes|Y|y ) SETUP_TYPE=suse;;
@@ -312,14 +302,11 @@ print_help() {
 
 Script to set up SimpleRisk on a server.
 
-./simplerisk-setup [-d|--debug] [--yes] [-h|--help] [--validate-os-only]
+./simplerisk-setup [-d|--debug] [--yes] [-h|--help]
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
 -t|--testing:          Picks the current testing version
---validate-os-only:    Only validates if the current host (OS and version) are supported
-                         by the script. This option does not require running the script
-			 as superuser.
 --yes:                 Will answer yes on every question (Use it carefully)
 -h|--help:             Shows instructions on how to use this script
 EOC
