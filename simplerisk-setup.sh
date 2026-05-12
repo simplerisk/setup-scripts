@@ -98,20 +98,16 @@ ask_user_uninstall(){
 load_os_variables(){
 	# freedesktop.org and systemd
 	if [ -f /etc/os-release ]; then
-		# shellcheck source=/dev/null
-		. /etc/os-release
-		OS=$NAME
-		VER=$VERSION_ID
+		OS=$(grep -oP '^NAME=\K.*' /etc/os-release 2>/dev/null | tr -d '"')
+		VER=$(grep -oP '^VERSION_ID=\K.*' /etc/os-release 2>/dev/null | tr -d '"')
 	# linuxbase.org
 	elif type lsb_release >/dev/null 2>&1; then
 		OS=$(lsb_release -si)
 		VER=$(lsb_release -sr)
 	# For some versions of Debian/Ubuntu without lsb_release command
 	elif [ -f /etc/lsb-release ]; then
-		# shellcheck source=/dev/null
-		. /etc/lsb-release
-		OS=$DISTRIB_ID
-		VER=$DISTRIB_RELEASE
+		OS=$(grep -oP '^DISTRIB_ID=\K.*' /etc/lsb-release 2>/dev/null | tr -d '"')
+		VER=$(grep -oP '^DISTRIB_RELEASE=\K.*' /etc/lsb-release 2>/dev/null | tr -d '"')
 	# Older Debian/Ubuntu/etc.
 	elif [ -f /etc/debian_version ]; then
 		OS=$DEBIAN_OSVAR
@@ -240,6 +236,19 @@ exec_cmd_nobail() {
 	bash -c "${1} ${no_log}"
 }
 
+# run_cmd / run_cmd_nobail: array-safe wrappers that pass arguments directly
+# to the target program (no shell double-evaluation).  Use these for simple
+# commands with no pipes, redirects, or compound operators.
+run_cmd_nobail() {
+	if [ -v DEBUG ]; then printf '+ %s\n' "$*"; fi
+	if [ ! -v DEBUG ]; then
+		"$@" > /dev/null 2>&1
+	else
+		"$@"
+	fi
+}
+run_cmd() { run_cmd_nobail "$@" || bail; }
+
 create_random_password() {
 	local char_pattern='A-Za-z0-9'
 	if [ -n "${2:-}" ]; then
@@ -287,11 +296,11 @@ set_up_database() {
 set_php_settings() {
 	# $1 receives the path to php settings file
 	print_status 'Setting the maximum file upload size in PHP to 5MB and memory limit to 256M...'
-	exec_cmd "sed -i 's/\(upload_max_filesize =\) .*/\1 5M/g' $1"
-	exec_cmd "sed -i 's/\(memory_limit =\) .*/\1 256M/g' $1"
+	run_cmd sed -i "s/\(upload_max_filesize =\) .*/\1 5M/g" "$1"
+	run_cmd sed -i "s/\(memory_limit =\) .*/\1 256M/g" "$1"
 
 	print_status 'Setting the maximum input variables in PHP to 3000...'
-	exec_cmd "sed -i 's/\(;\|\#\)\?\(max_input_vars =\).*/\2 3000/g' $1"
+	run_cmd sed -i "s/\(;\|\#\)\?\(max_input_vars =\).*/\2 3000/g" "$1"
 }
 
 set_up_simplerisk() {
@@ -299,15 +308,15 @@ set_up_simplerisk() {
 # $2 receives current SimpleRisk's version
 	print_status 'Downloading the latest SimpleRisk release to /var/www/simplerisk...'
 	if [ ! -d /var/www ]; then
-		exec_cmd 'mkdir -p /var/www/'
+		run_cmd mkdir -p /var/www/
 	elif [ -d /var/www/html ]; then
-		exec_cmd 'rm -r /var/www/html'
+		run_cmd rm -r /var/www/html
 	fi
 	exec_cmd "cd /var/www && wget https://simplerisk-downloads.s3.amazonaws.com/public/bundles/simplerisk-${2}.tgz"
 	exec_cmd "cd /var/www && tar xvzf simplerisk-${2}.tgz"
-	exec_cmd "rm -f /var/www/simplerisk-${2}.tgz"
+	run_cmd rm -f "/var/www/simplerisk-${2}.tgz"
 	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql -O database.sql"
-	exec_cmd "chown -R ${1}: /var/www/simplerisk"
+	run_cmd chown -R "${1}:" /var/www/simplerisk
 }
 
 set_up_backup_cronjob() {
@@ -392,18 +401,28 @@ setup_ubuntu_debian(){
 	print_status "Running SimpleRisk ${1} installer..."
 
 	print_status 'Populating apt-get cache...'
-	exec_cmd 'apt-get update'
+	run_cmd apt-get update
 
 	# Add PHP8/MySQL repos for Debian
 	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
-		exec_cmd 'mkdir -p /etc/apt/keyrings'
+		run_cmd mkdir -p /etc/apt/keyrings
 		local apt_php_version=8.5
 
 		print_status 'Install gnupg to handle keyrings...'
-		exec_cmd 'apt-get install -y gnupg'
+		run_cmd apt-get install -y gnupg
 
 		print_status "Adding Ondrej's repository with PHP8"
-		exec_cmd 'wget -qO - https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /etc/apt/keyrings/sury-php.gpg'
+		# Download the Sury PHP signing key and verify its fingerprint before trusting it.
+		run_cmd curl -fsSL https://packages.sury.org/php/apt.gpg -o /etc/apt/keyrings/sury-php.gpg
+		local sury_expected_fp="15058500A0235D97F5D10063B188E2B695BD4743"
+		local sury_actual_fp
+		sury_actual_fp=$(gpg --no-default-keyring \
+			--keyring /etc/apt/keyrings/sury-php.gpg \
+			--fingerprint --with-colons 2>/dev/null | awk -F: '/^fpr/{print $10; exit}')
+		if [[ "${sury_actual_fp}" != "${sury_expected_fp}" ]]; then
+			rm -f /etc/apt/keyrings/sury-php.gpg
+			print_error_message "Sury PHP GPG key fingerprint mismatch (got '${sury_actual_fp}', expected '${sury_expected_fp}') — aborting."
+		fi
 		exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
 
 		print_status 'Adding MySQL 8 repository'
@@ -412,59 +431,59 @@ setup_ubuntu_debian(){
 		exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
 
 		print_status 'Re-populating apt-get cache with added repos...'
-		exec_cmd 'apt-get update'
+		run_cmd apt-get update
 	fi
 
 	print_status 'Updating current packages (this may take a bit)...'
-	exec_cmd 'apt-get dist-upgrade -qq --assume-yes'
+	run_cmd apt-get dist-upgrade -qq --assume-yes
 
 	if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		print_status 'Installing lamp-server...'
-		exec_cmd 'apt-get install -y lamp-server^'
+		run_cmd apt-get install -y 'lamp-server^'
 		print_status 'Installing cron...'
-		exec_cmd 'apt-get install -y cron'
+		run_cmd apt-get install -y cron
 	else
 		print_status 'Installing Apache...'
-		exec_cmd 'apt-get install -y apache2'
+		run_cmd apt-get install -y apache2
 
 		print_status 'Installing MySQL...'
-		exec_cmd 'apt-get install -y mysql-server'
+		run_cmd apt-get install -y mysql-server
 
 		print_status 'Installing PHP...'
-		exec_cmd "apt-get install -y php${apt_php_version:-} php${apt_php_version:-}-mysql libapache2-mod-php${apt_php_version:-}"
+		run_cmd apt-get install -y "php${apt_php_version:-}" "php${apt_php_version:-}-mysql" "libapache2-mod-php${apt_php_version:-}"
 
 		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 			if [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
 				print_status 'Installing crontab'
-				exec_cmd 'apt-get install -y cron'
+				run_cmd apt-get install -y cron
 			fi
 		fi
 	fi
 
 	print_status 'Installing PHP development libraries...'
-	exec_cmd "apt-get install -y php${apt_php_version:-}-dev"
+	run_cmd apt-get install -y "php${apt_php_version:-}-dev"
 
 	for module in xml mbstring mysql ldap curl gd zip intl; do
 		print_status "Installing the $module module for PHP..."
-		exec_cmd "apt-get install -y php${apt_php_version:-}-$module"
+		run_cmd apt-get install -y "php${apt_php_version:-}-$module"
 	done
 
 	print_status 'Enabling the ldap module in PHP...'
-	exec_cmd 'phpenmod ldap'
+	run_cmd phpenmod ldap
 
 	print_status 'Enabling SSL for Apache...'
-	exec_cmd 'a2enmod rewrite'
-	exec_cmd 'a2enmod ssl'
-	exec_cmd 'a2ensite default-ssl'
+	run_cmd a2enmod rewrite
+	run_cmd a2enmod ssl
+	run_cmd a2ensite default-ssl
 
 	print_status 'Installing sendmail...'
-	exec_cmd 'apt-get install -y sendmail'
+	run_cmd apt-get install -y sendmail
 
 	print_status 'Configuring secure settings for Apache...'
-	exec_cmd "sed -i 's/\(SSLProtocol\) all -SSLv3/\1 TLSv1.2/g' /etc/apache2/mods-enabled/ssl.conf"
-	exec_cmd "sed -i 's/#\?\(SSLHonorCipherOrder\) on/\1 on/g' /etc/apache2/mods-enabled/ssl.conf"
-	exec_cmd "sed -i 's/\(ServerTokens\) OS/\1 Prod/g' /etc/apache2/conf-enabled/security.conf"
-	exec_cmd "sed -i 's/\(ServerSignature\) On/\1 Off/g' /etc/apache2/conf-enabled/security.conf"
+	run_cmd sed -i 's/\(SSLProtocol\) all -SSLv3/\1 TLSv1.2/g' /etc/apache2/mods-enabled/ssl.conf
+	run_cmd sed -i 's/#\?\(SSLHonorCipherOrder\) on/\1 on/g' /etc/apache2/mods-enabled/ssl.conf
+	run_cmd sed -i 's/\(ServerTokens\) OS/\1 Prod/g' /etc/apache2/conf-enabled/security.conf
+	run_cmd sed -i 's/\(ServerSignature\) On/\1 Off/g' /etc/apache2/conf-enabled/security.conf
 
 	# Obtaining php version to find settings file path
 	[ -n "${apt_php_version:-}" ] && php_version=$apt_php_version || php_version=$(get_installed_php_version)
@@ -474,11 +493,11 @@ setup_ubuntu_debian(){
 	set_up_simplerisk 'www-data' "${1}"
 
 	print_status 'Configuring Apache...'
-	exec_cmd "sed -i 's|\(/var/www/\)html|\1simplerisk|g' /etc/apache2/sites-enabled/000-default.conf"
+	run_cmd sed -i 's|\(/var/www/\)html|\1simplerisk|g' /etc/apache2/sites-enabled/000-default.conf
 	if ! grep -q 'RewriteEngine On' /etc/apache2/sites-enabled/000-default.conf; then
 		exec_cmd "sed -i '/^<\/VirtualHost>/i \\\tRewriteEngine On\n\tRewriteCond %{HTTPS} !=on\n\tRewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]' /etc/apache2/sites-enabled/000-default.conf"
 	fi
-	exec_cmd "sed -i 's|/var/www/html|/var/www/simplerisk|g' /etc/apache2/sites-enabled/default-ssl.conf"
+	run_cmd sed -i 's|/var/www/html|/var/www/simplerisk|g' /etc/apache2/sites-enabled/default-ssl.conf
 	if ! grep -q 'AllowOverride all' /etc/apache2/sites-enabled/default-ssl.conf; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/apache2/sites-enabled/default-ssl.conf"
 	fi
@@ -488,10 +507,10 @@ setup_ubuntu_debian(){
 	# `sed -i`.  Write to a temp file then overwrite the original in place.
 	exec_cmd "sed 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts > /tmp/hosts.bak && cat /tmp/hosts.bak > /etc/hosts && rm -f /tmp/hosts.bak"
 	exec_cmd 'yes | sendmailconfig'
-	exec_cmd 'service sendmail restart'
+	run_cmd service sendmail restart
 
 	print_status 'Restarting Apache to load the new configuration...'
-	exec_cmd 'service apache2 restart'
+	run_cmd service apache2 restart
 
 	generate_passwords
 
@@ -503,22 +522,22 @@ setup_ubuntu_debian(){
 	set_up_database
 
 	print_status 'Restarting MySQL to load the new configuration...'
-	exec_cmd 'service mysql restart'
+	run_cmd service mysql restart
 
 	print_status 'Removing the SimpleRisk database file...'
-	exec_cmd 'rm -r /var/www/simplerisk/database.sql'
+	run_cmd rm -r /var/www/simplerisk/database.sql
 
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
 
 	print_status 'Installing UFW firewall...'
-	exec_cmd 'apt-get install -y ufw'
+	run_cmd apt-get install -y ufw
 
 	print_status 'Enabling UFW firewall...'
-	exec_cmd 'ufw allow ssh'
-	exec_cmd 'ufw allow http'
-	exec_cmd 'ufw allow https'
-	exec_cmd 'ufw --force enable'
+	run_cmd ufw allow ssh
+	run_cmd ufw allow http
+	run_cmd ufw allow https
+	run_cmd ufw --force enable
 }
 
 setup_centos_rhel(){
@@ -526,33 +545,33 @@ setup_centos_rhel(){
 	local major_version="${VER%%.*}"
 
 	print_status "Updating packages. This may take some time."
-	exec_cmd "dnf -y update"
+	run_cmd dnf -y update
 
 	print_status 'Installing the wget package...'
-	exec_cmd "dnf -y install wget"
+	run_cmd dnf -y install wget
 
 	print_status 'Installing Firewalld...'
-	exec_cmd "dnf -y install firewalld"
+	run_cmd dnf -y install firewalld
 
 	print_status 'Enabling MySQL 8 repositories...'
-	exec_cmd "rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-el${major_version}-2.noarch.rpm"
-	exec_cmd "rpm --import $MYSQL_KEY_URL"
+	run_cmd rpm -Uvh "https://dev.mysql.com/get/mysql84-community-release-el${major_version}-2.noarch.rpm"
+	run_cmd rpm --import "$MYSQL_KEY_URL"
 
 	print_status 'Enabling PHP 8 repositories...'
-	exec_cmd "dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${major_version}.noarch.rpm"
+	run_cmd dnf -y install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-${major_version}.noarch.rpm"
 	case $major_version in
-		8) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2018";;
-		9) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2021";;
-		10) exec_cmd "rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2025";;
+		8) run_cmd rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2018;;
+		9) run_cmd rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2021;;
+		10) run_cmd rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2025;;
 	esac
-	exec_cmd "dnf -y install https://rpms.remirepo.net/enterprise/remi-release-${major_version}.rpm"
-	exec_cmd "dnf -y update"
+	run_cmd dnf -y install "https://rpms.remirepo.net/enterprise/remi-release-${major_version}.rpm"
+	run_cmd dnf -y update
 
 
 	print_status 'Installing PHP for Apache...'
-	exec_cmd "dnf -y module reset php"
-	exec_cmd "dnf -y module enable php:remi-8.5"
-	exec_cmd "dnf -y install httpd php php-cli php-common php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process"
+	run_cmd dnf -y module reset php
+	run_cmd dnf -y module enable php:remi-8.5
+	run_cmd dnf -y install httpd php php-cli php-common php-mysqlnd php-mbstring php-opcache php-gd php-zip php-json php-ldap php-curl php-xml php-intl php-process
 
 	set_php_settings /etc/php.ini
 
@@ -563,31 +582,31 @@ setup_centos_rhel(){
 	# where mysql8.4-server does not exist in any enabled repo.
 	# The mysql84-community-release RPM also enables a mysql-9.x-lts-community
 	# repo; disable it so DNF resolves mysql-community-server from 8.4, not 9.x.
-	exec_cmd "dnf install -y mysql-community-server --exclude 'mariadb*' --exclude 'mysql8.4*' --disablerepo='mysql-9*'"
+	run_cmd dnf install -y mysql-community-server --exclude 'mariadb*' --exclude 'mysql8.4*' --disablerepo='mysql-9*'
 
 	print_status 'Enabling and starting MySQL database server...'
-	exec_cmd 'systemctl enable mysqld'
-	exec_cmd 'systemctl start mysqld'
+	run_cmd systemctl enable mysqld
+	run_cmd systemctl start mysqld
 
 	if [[ "${VER}" = 8* ]]; then
-		exec_cmd "dnf clean all"
+		run_cmd dnf clean all
 		exec_cmd 'rm -rf /var/cache/dnf/remi-*a'
-		exec_cmd "dnf -y update"
+		run_cmd dnf -y update
 	fi
 
 	print_status 'Installing mod_ssl'
-	exec_cmd "dnf -y install mod_ssl"
+	run_cmd dnf -y install mod_ssl
 
 	print_status 'Installing sendmail'
-	exec_cmd "dnf -y install sendmail sendmail-cf m4"
+	run_cmd dnf -y install sendmail sendmail-cf m4
 
 	set_up_simplerisk 'apache' "${1}"
 
 	print_status 'Configuring Apache...'
-	exec_cmd "sed -i 's|#\?\(DocumentRoot \"/var/www/\)html\"|\1simplerisk\"|' /etc/httpd/conf.d/ssl.conf"
+	run_cmd sed -i 's|#\?\(DocumentRoot "/var/www/\)html"|\1simplerisk"|' /etc/httpd/conf.d/ssl.conf
 	exec_cmd 'mv /etc/httpd/conf.d/welcome.conf{,.disabled}'
 	exec_cmd 'mkdir /etc/httpd/sites-{available,enabled}'
-	exec_cmd "sed -i 's|\(DocumentRoot \"/var/www\).*|\1\"|g' /etc/httpd/conf/httpd.conf"
+	run_cmd sed -i 's|\(DocumentRoot "/var/www\).*|\1"|g' /etc/httpd/conf/httpd.conf
 	echo 'IncludeOptional sites-enabled/*.conf' >> /etc/httpd/conf/httpd.conf
 	cat << EOF > /etc/httpd/sites-enabled/simplerisk.conf
 <VirtualHost *:80>
@@ -608,8 +627,8 @@ EOF
 	if ! grep -q 'AllowOverride all' /etc/httpd/conf.d/ssl.conf; then
 		exec_cmd "sed -i '/<\/Directory>/a \\\t\t<Directory \"\/var\/www\/simplerisk\">\n\t\t\tAllowOverride all\n\t\t\tallow from all\n\t\t\tOptions -Indexes\n\t\t<\/Directory>' /etc/httpd/conf.d/ssl.conf"
 	fi
-	exec_cmd "sed -i 's/#\(LoadModule mpm_prefork\)/\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
-	exec_cmd "sed -i 's/\(LoadModule mpm_event\)/#\1/g' /etc/httpd/conf.modules.d/00-mpm.conf"
+	run_cmd sed -i 's/#\(LoadModule mpm_prefork\)/\1/g' /etc/httpd/conf.modules.d/00-mpm.conf
+	run_cmd sed -i 's/\(LoadModule mpm_event\)/#\1/g' /etc/httpd/conf.modules.d/00-mpm.conf
 
 	generate_passwords
 
@@ -624,81 +643,81 @@ EOF
 		> /etc/my.cnf.d/zz-simplerisk.cnf
 
 	print_status 'Restarting MySQL to load the new configuration...'
-	exec_cmd 'systemctl restart mysqld'
+	run_cmd systemctl restart mysqld
 	exec_cmd "mysql -uroot -p\"${NEW_MYSQL_ROOT_PASSWORD}\" \
 		-e \"SET GLOBAL sql_mode='ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';\" \
 		2>/dev/null"
 
 	print_status 'Removing the SimpleRisk database file...'
-	exec_cmd 'rm -r /var/www/simplerisk/database.sql'
+	run_cmd rm -r /var/www/simplerisk/database.sql
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
 
 	print_status 'Enabling and starting the Apache web server...'
-	exec_cmd 'systemctl enable httpd'
-	exec_cmd 'systemctl start httpd'
+	run_cmd systemctl enable httpd
+	run_cmd systemctl start httpd
 
 	print_status 'Configuring and starting Sendmail...'
 	exec_cmd "sed 's/\(localhost\)/\1 $(hostname)/g' /etc/hosts > /tmp/hosts.bak && cat /tmp/hosts.bak > /etc/hosts && rm -f /tmp/hosts.bak"
-	exec_cmd 'systemctl start sendmail'
+	run_cmd systemctl start sendmail
 
 	print_status 'Opening Firewall for HTTP/HTTPS traffic'
-	exec_cmd 'systemctl enable firewalld'
-	exec_cmd 'systemctl start firewalld'
+	run_cmd systemctl enable firewalld
+	run_cmd systemctl start firewalld
 	for service in http https ssh; do
-		exec_cmd "firewall-cmd --permanent --zone=public --add-service=${service}"
+		run_cmd firewall-cmd --permanent --zone=public "--add-service=${service}"
 	done
-	exec_cmd 'firewall-cmd --reload'
+	run_cmd firewall-cmd --reload
 
 	print_status 'Configuring SELinux for SimpleRisk...'
 	value_one_permissions=('httpd_builtin_scripting' 'httpd_can_network_connect' 'httpd_can_sendmail' 'httpd_dbus_avahi' 'httpd_enable_cgi' 'httpd_read_user_content' 'httpd_tty_comm')
 	for permission in "${value_one_permissions[@]}"; do
-		exec_cmd "setsebool -P $permission=1"
+		run_cmd setsebool -P "$permission=1"
 	done
 	value_nil_permissions=('allow_httpd_anon_write' 'allow_httpd_mod_auth_ntlm_winbind' 'allow_httpd_mod_auth_pam' 'allow_httpd_sys_script_anon_write' 'httpd_can_check_spam' 'httpd_can_network_connect_cobbler' 'httpd_can_network_connect_db' 'httpd_can_network_memcache' 'httpd_can_network_relay' 'httpd_dbus_sssd' 'httpd_enable_ftp_server' 'httpd_enable_homedirs' 'httpd_execmem' 'httpd_manage_ipa' 'httpd_run_preupgrade' 'httpd_run_stickshift' 'httpd_serve_cobbler_files' 'httpd_setrlimit' 'httpd_ssi_exec' 'httpd_tmp_exec' 'httpd_use_cifs' 'httpd_use_fusefs' 'httpd_use_gpg' 'httpd_use_nfs' 'httpd_use_openstack' 'httpd_verify_dns')
 	for permission in "${value_nil_permissions[@]}"; do
-		exec_cmd "setsebool -P $permission=0"
+		run_cmd setsebool -P "$permission=0"
 	done
-	exec_cmd 'chcon -R -t httpd_sys_rw_content_t /var/www/simplerisk'
+	run_cmd chcon -R -t httpd_sys_rw_content_t /var/www/simplerisk
 }
 
 setup_suse(){
 	print_status "Running SimpleRisk ${1} installer..."
 
 	print_status 'Populating zypper cache...'
-	exec_cmd 'zypper -n update'
+	run_cmd zypper -n update
 
 	if ! rpm -q mysql84-community-release; then
 		print_status 'Adding MySQL 8 repository...'
-		exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm'
-		exec_cmd "rpm --import $MYSQL_KEY_URL"
+		run_cmd rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm
+		run_cmd rpm --import "$MYSQL_KEY_URL"
 	fi
 
 	print_status 'Installing Apache...'
-	exec_cmd 'zypper -n install apache2'
+	run_cmd zypper -n install apache2
 
 	print_status 'Enabling Apache on reboot...'
-	exec_cmd 'systemctl enable apache2'
+	run_cmd systemctl enable apache2
 
 	print_status 'Starting Apache...'
-	exec_cmd 'systemctl start apache2'
+	run_cmd systemctl start apache2
 
 	print_status 'Installing MySQL 8...'
-	exec_cmd 'zypper -n install mysql-community-server'
+	run_cmd zypper -n install mysql-community-server
 
 	print_status 'Enabling MySQL on reboot...'
-	exec_cmd 'systemctl enable mysql'
+	run_cmd systemctl enable mysql
 
 	print_status 'Starting MySQL...'
-	exec_cmd 'systemctl start mysql'
+	run_cmd systemctl start mysql
 
 	print_status 'Installing PHP 8...'
-	exec_cmd 'zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php-xml'
+	run_cmd zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php-xml
 
 	if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
 		print_status 'Enabling PHP and Apache modules...'
 		for module in php8 rewrite ssl mod_ssl; do
-			exec_cmd "a2enmod $module"
+			run_cmd a2enmod "$module"
 		done
 	fi
 
@@ -731,17 +750,17 @@ EOF
 
 	# Generate the OpenSSL private key
 	exec_cmd 'openssl rand -hex 50 > /tmp/pass_openssl.txt'
-	exec_cmd 'openssl genrsa -des3 -passout file:/tmp/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key'
-	exec_cmd 'openssl rsa -passin file:/tmp/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key'
+	run_cmd openssl genrsa -des3 -passout file:/tmp/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key
+	run_cmd openssl rsa -passin file:/tmp/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key
 
 	# Remove the original key file
-	exec_cmd 'rm /etc/apache2/ssl.key/simplerisk.pass.key /tmp/pass_openssl.txt'
+	run_cmd rm /etc/apache2/ssl.key/simplerisk.pass.key /tmp/pass_openssl.txt
 
 	# Generate the CSR
-	exec_cmd 'openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out  /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk"'
+	run_cmd openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.csr/simplerisk.csr -subj /CN=simplerisk
 
 	# Create the Certificate
-	exec_cmd 'openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt'
+	run_cmd openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt
 
 	cat << EOF >> /etc/apache2/vhosts.d/ssl.conf
 <VirtualHost *:443>
@@ -763,10 +782,10 @@ EOF
 EOF
 
 	print_status 'Configuring secure settings for Apache...'
-	exec_cmd "sed -i 's/\(SSLProtocol\).*/\1 TLSv1.2/g' /etc/apache2/ssl-global.conf"
-	exec_cmd "sed -i 's/#\?\(SSLHonorCipherOrder\)/\1/g' /etc/apache2/ssl-global.conf"
-	#exec_cmd "sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf"
-	#exec_cmd "sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf"
+	run_cmd sed -i 's/\(SSLProtocol\).*/\1 TLSv1.2/g' /etc/apache2/ssl-global.conf
+	run_cmd sed -i 's/#\?\(SSLHonorCipherOrder\)/\1/g' /etc/apache2/ssl-global.conf
+	#run_cmd sed -i 's/ServerTokens OS/ServerTokens Prod/g' /etc/apache2/conf-enabled/security.conf
+	#run_cmd sed -i 's/ServerSignature On/ServerSignature Off/g' /etc/apache2/conf-enabled/security.conf
 
 	set_php_settings /etc/php8/apache2/php.ini
 
@@ -778,14 +797,14 @@ EOF
 	set_up_simplerisk 'wwwrun' "${1}"
 
 	print_status 'Restarting Apache to load the new configuration...'
-	exec_cmd 'systemctl restart apache2'
+	run_cmd systemctl restart apache2
 
 	print_status 'Configuring MySQL...'
 	if [[ "${VER}" = 15* ]]; then
 		exec_cmd "sed -i 's/\(\[mysqld\]\)/\1\nsql_mode=NO_ENGINE_SUBSTITUTION/g' /etc/my.cnf"
 	fi
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
-	exec_cmd "sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf"
+	run_cmd sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf
 
 	if [[ "${VER}" = 15* ]]; then
 		set_up_database	/var/log/mysql/mysqld.log
@@ -794,10 +813,10 @@ EOF
 	fi
 
 	print_status 'Restarting MySQL to load the new configuration...'
-	exec_cmd 'systemctl restart mysql'
+	run_cmd systemctl restart mysql
 
 	print_status 'Removing the SimpleRisk database file...'
-	exec_cmd 'rm -r /var/www/simplerisk/database.sql'
+	run_cmd rm -r /var/www/simplerisk/database.sql
 
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
@@ -820,33 +839,33 @@ uninstall_ubuntu_debian(){
 	drop_simplerisk_database
 
 	print_status 'Stopping services...'
-	exec_cmd_nobail 'service apache2 stop'
-	exec_cmd_nobail 'service mysql stop'
-	exec_cmd_nobail 'service sendmail stop'
+	run_cmd_nobail service apache2 stop
+	run_cmd_nobail service mysql stop
+	run_cmd_nobail service sendmail stop
 
 	print_status 'Removing SimpleRisk application files...'
-	exec_cmd_nobail 'rm -rf /var/www/simplerisk'
+	run_cmd_nobail rm -rf /var/www/simplerisk
 
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin"
-	exec_cmd_nobail 'apt-get autoremove -y'
-	exec_cmd_nobail 'apt-get autoclean'
+	run_cmd_nobail apt-get autoremove -y
+	run_cmd_nobail apt-get autoclean
 
 	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 		print_status 'Removing added repositories and keys...'
-		exec_cmd_nobail 'rm -f /etc/apt/sources.list.d/sury-php.list'
-		exec_cmd_nobail 'rm -f /etc/apt/sources.list.d/mysql.list'
-		exec_cmd_nobail 'rm -f /etc/apt/keyrings/sury-php.gpg'
-		exec_cmd_nobail 'rm -f /etc/apt/trusted.gpg.d/mysql.gpg'
-		exec_cmd_nobail 'apt-get update'
+		run_cmd_nobail rm -f /etc/apt/sources.list.d/sury-php.list
+		run_cmd_nobail rm -f /etc/apt/sources.list.d/mysql.list
+		run_cmd_nobail rm -f /etc/apt/keyrings/sury-php.gpg
+		run_cmd_nobail rm -f /etc/apt/trusted.gpg.d/mysql.gpg
+		run_cmd_nobail apt-get update
 	fi
 
 	print_status 'Removing UFW firewall rules for SimpleRisk...'
-	exec_cmd_nobail 'ufw delete allow http'
-	exec_cmd_nobail 'ufw delete allow https'
+	run_cmd_nobail ufw delete allow http
+	run_cmd_nobail ufw delete allow https
 
 	print_status 'Removing MySQL password file...'
-	exec_cmd_nobail 'rm -f /root/passwords.txt'
+	run_cmd_nobail rm -f /root/passwords.txt
 }
 
 uninstall_centos_rhel(){
@@ -857,39 +876,39 @@ uninstall_centos_rhel(){
 	drop_simplerisk_database
 
 	print_status 'Stopping and disabling services...'
-	exec_cmd_nobail 'systemctl stop httpd'
-	exec_cmd_nobail 'systemctl disable httpd'
-	exec_cmd_nobail 'systemctl stop mysqld'
-	exec_cmd_nobail 'systemctl disable mysqld'
-	exec_cmd_nobail 'systemctl stop sendmail'
+	run_cmd_nobail systemctl stop httpd
+	run_cmd_nobail systemctl disable httpd
+	run_cmd_nobail systemctl stop mysqld
+	run_cmd_nobail systemctl disable mysqld
+	run_cmd_nobail systemctl stop sendmail
 
 	print_status 'Removing SimpleRisk application files...'
-	exec_cmd_nobail 'rm -rf /var/www/simplerisk'
+	run_cmd_nobail rm -rf /var/www/simplerisk
 
 	print_status 'Removing SimpleRisk Apache virtual host config...'
-	exec_cmd_nobail 'rm -f /etc/httpd/sites-enabled/simplerisk.conf'
-	exec_cmd_nobail 'rm -rf /etc/httpd/sites-available /etc/httpd/sites-enabled'
-	exec_cmd_nobail "sed -i '/IncludeOptional sites-enabled\/\*.conf/d' /etc/httpd/conf/httpd.conf"
+	run_cmd_nobail rm -f /etc/httpd/sites-enabled/simplerisk.conf
+	run_cmd_nobail rm -rf /etc/httpd/sites-available /etc/httpd/sites-enabled
+	run_cmd_nobail sed -i '/IncludeOptional sites-enabled\/*.conf/d' /etc/httpd/conf/httpd.conf
 	exec_cmd_nobail 'mv /etc/httpd/conf.d/welcome.conf.disabled /etc/httpd/conf.d/welcome.conf 2>/dev/null || true'
 
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "dnf -y remove httpd mod_ssl 'php*' mysql-community-server mysql-community-client sendmail sendmail-cf m4"
-	exec_cmd_nobail 'dnf -y autoremove'
+	run_cmd_nobail dnf -y autoremove
 
 	print_status 'Removing MySQL and PHP repositories...'
 	local major_version="${VER%%.*}"
 	exec_cmd_nobail "rpm -e mysql84-community-release-el${major_version} 2>/dev/null || true"
-	exec_cmd_nobail "dnf -y remove epel-release"
+	run_cmd_nobail dnf -y remove epel-release
 	exec_cmd_nobail "rpm -e remi-release-${major_version} 2>/dev/null || true"
-	exec_cmd_nobail "dnf clean all"
+	run_cmd_nobail dnf clean all
 
 	print_status 'Removing firewall rules for SimpleRisk...'
-	exec_cmd_nobail 'firewall-cmd --permanent --zone=public --remove-service=http'
-	exec_cmd_nobail 'firewall-cmd --permanent --zone=public --remove-service=https'
-	exec_cmd_nobail 'firewall-cmd --reload'
+	run_cmd_nobail firewall-cmd --permanent --zone=public --remove-service=http
+	run_cmd_nobail firewall-cmd --permanent --zone=public --remove-service=https
+	run_cmd_nobail firewall-cmd --reload
 
 	print_status 'Removing MySQL password file...'
-	exec_cmd_nobail 'rm -f /root/passwords.txt'
+	run_cmd_nobail rm -f /root/passwords.txt
 }
 
 uninstall_suse(){
@@ -900,31 +919,31 @@ uninstall_suse(){
 	drop_simplerisk_database
 
 	print_status 'Stopping and disabling services...'
-	exec_cmd_nobail 'systemctl stop apache2'
-	exec_cmd_nobail 'systemctl disable apache2'
-	exec_cmd_nobail 'systemctl stop mysql'
-	exec_cmd_nobail 'systemctl disable mysql'
+	run_cmd_nobail systemctl stop apache2
+	run_cmd_nobail systemctl disable apache2
+	run_cmd_nobail systemctl stop mysql
+	run_cmd_nobail systemctl disable mysql
 
 	print_status 'Removing SimpleRisk application files...'
-	exec_cmd_nobail 'rm -rf /var/www/simplerisk'
+	run_cmd_nobail rm -rf /var/www/simplerisk
 
 	print_status 'Removing SimpleRisk Apache virtual host and SSL config...'
-	exec_cmd_nobail 'rm -f /etc/apache2/vhosts.d/simplerisk.conf'
-	exec_cmd_nobail 'rm -f /etc/apache2/vhosts.d/ssl.conf'
-	exec_cmd_nobail 'rm -f /etc/apache2/ssl.key/simplerisk.key'
-	exec_cmd_nobail 'rm -f /etc/apache2/ssl.csr/simplerisk.csr'
-	exec_cmd_nobail 'rm -f /etc/apache2/ssl.crt/simplerisk.crt'
-	exec_cmd_nobail "sed -i '/LoadModule rewrite_module.*mod_rewrite.so/d' /etc/apache2/loadmodule.conf"
+	run_cmd_nobail rm -f /etc/apache2/vhosts.d/simplerisk.conf
+	run_cmd_nobail rm -f /etc/apache2/vhosts.d/ssl.conf
+	run_cmd_nobail rm -f /etc/apache2/ssl.key/simplerisk.key
+	run_cmd_nobail rm -f /etc/apache2/ssl.csr/simplerisk.csr
+	run_cmd_nobail rm -f /etc/apache2/ssl.crt/simplerisk.crt
+	run_cmd_nobail sed -i '/LoadModule rewrite_module.*mod_rewrite.so/d' /etc/apache2/loadmodule.conf
 
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
-	exec_cmd_nobail 'zypper -n autoremove'
+	run_cmd_nobail zypper -n autoremove
 
 	print_status 'Removing MySQL repository...'
 	exec_cmd_nobail 'rpm -e mysql84-community-release-sl15 2>/dev/null || true'
 
 	print_status 'Removing MySQL password file...'
-	exec_cmd_nobail 'rm -f /root/passwords.txt'
+	run_cmd_nobail rm -f /root/passwords.txt
 }
 
 ## Defer setup until we have the complete script
