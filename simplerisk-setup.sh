@@ -17,6 +17,10 @@ readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com
 ## MAIN FLOW FUNCTIONS ##
 #########################
 setup (){
+	# Auto-detect piped/non-interactive execution (e.g. curl | bash) and set
+	# HEADLESS so ask_user is skipped and the install can proceed unattended.
+	if ! [ -t 0 ] && [ ! -v HEADLESS ]; then HEADLESS=y; fi
+
 	validate_args "${@:1}"
 
 	check_root
@@ -76,11 +80,14 @@ ask_user(){
 		print_error_message "No interactive terminal available. Re-run with --yes."
 	fi
 
-	read -r -p 'This script will install SimpleRisk.  Proceed? [ Yes / (N)o ]: ' answer < /dev/tty
-	case "${answer}" in
-		Yes|yes|Y|y ) ;;
-		* ) exit 1;;
-	esac
+	while true; do
+		read -r -p 'This script will install SimpleRisk.  Proceed? [ Yes / (N)o ]: ' answer < /dev/tty
+		case "${answer}" in
+			Yes|yes|Y|y ) break;;
+			No|no|N|n ) exit 1;;
+			* ) echo "Please answer Yes or No.";;
+		esac
+	done
 }
 
 ask_user_uninstall(){
@@ -88,11 +95,14 @@ ask_user_uninstall(){
 		print_error_message "No interactive terminal available. Re-run with --yes."
 	fi
 
-	read -r -p 'This script will UNINSTALL SimpleRisk and remove all associated packages, files, and data. This action is IRREVERSIBLE. Proceed? [ Yes / (N)o ]: ' answer < /dev/tty
-	case "${answer}" in
-		Yes|yes|Y|y ) ;;
-		* ) exit 1;;
-	esac
+	while true; do
+		read -r -p 'This script will UNINSTALL SimpleRisk and remove all associated packages, files, and data. This action is IRREVERSIBLE. Proceed? [ Yes / (N)o ]: ' answer < /dev/tty
+		case "${answer}" in
+			Yes|yes|Y|y ) break;;
+			No|no|N|n ) exit 1;;
+			* ) echo "Please answer Yes or No.";;
+		esac
+	done
 }
 
 load_os_variables(){
@@ -750,8 +760,8 @@ EOF
 
 	# Generate the OpenSSL private key
 	exec_cmd 'openssl rand -hex 50 > /tmp/pass_openssl.txt'
-	run_cmd openssl genrsa -des3 -passout file:/tmp/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key
-	run_cmd openssl rsa -passin file:/tmp/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key
+	run_cmd openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -aes-256-cbc -pass file:/tmp/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key
+	run_cmd openssl pkey -passin file:/tmp/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key
 
 	# Remove the original key file
 	run_cmd rm /etc/apache2/ssl.key/simplerisk.pass.key /tmp/pass_openssl.txt
