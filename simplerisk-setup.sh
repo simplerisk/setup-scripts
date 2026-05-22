@@ -299,8 +299,8 @@ set_up_database() {
 	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
 
 	print_status 'Setting the SimpleRisk database password...'
-	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
-	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)__DB_PASSWORD__/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
 }
 
 set_php_settings() {
