@@ -298,9 +298,13 @@ set_up_database() {
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\"${password_flag:-}"
 	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
 
-	print_status 'Setting the SimpleRisk database password...'
+	print_status 'Setup the config.php file'
 	exec_cmd "cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(DB_HOSTNAME', '\)__DB_HOSTNAME__/\1localhost/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(DB_PORT', '\)__DB_PORT__/\13306/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(DB_USERNAME', '\)__DB_USERNAME__/\1simplerisk/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)__DB_PASSWORD__/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(DB_DATABASE', '\)__DB_DATABASE__/\1simplerisk/\" /var/www/simplerisk/includes/config.php"
 }
 
 set_php_settings() {
