@@ -341,6 +341,16 @@ set_up_backup_cronjob() {
 	exec_cmd "(crontab -l 2>/dev/null; echo '* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php') | crontab -"
 }
 
+set_up_simplerisk_log() {
+	# $1 receives the apache user that should own the log directory and file
+	print_status 'Creating SimpleRisk log directory and file...'
+	run_cmd mkdir -p /var/log/simplerisk
+	run_cmd touch /var/log/simplerisk/simplerisk.log
+	run_cmd chown -R "${1}:" /var/log/simplerisk
+	run_cmd chmod 750 /var/log/simplerisk
+	run_cmd chmod 640 /var/log/simplerisk/simplerisk.log
+}
+
 get_current_simplerisk_version() {
 	curl -sL "https://updates${TESTING:+-test}.simplerisk.com/releases.xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2
 }
@@ -509,6 +519,7 @@ setup_ubuntu_debian(){
 	set_php_settings "/etc/php/$php_version/apache2/php.ini"
 
 	set_up_simplerisk 'www-data' "${1}"
+	set_up_simplerisk_log 'www-data'
 
 	print_status 'Configuring Apache...'
 	run_cmd sed -i 's|\(/var/www/\)html|\1simplerisk|g' /etc/apache2/sites-enabled/000-default.conf
@@ -619,6 +630,7 @@ setup_centos_rhel(){
 	run_cmd dnf -y install sendmail sendmail-cf m4
 
 	set_up_simplerisk 'apache' "${1}"
+	set_up_simplerisk_log 'apache'
 
 	print_status 'Configuring Apache...'
 	run_cmd sed -i 's|#\?\(DocumentRoot "/var/www/\)html"|\1simplerisk"|' /etc/httpd/conf.d/ssl.conf
@@ -697,6 +709,7 @@ EOF
 		run_cmd setsebool -P "$permission=0"
 	done
 	run_cmd chcon -R -t httpd_sys_rw_content_t /var/www/simplerisk
+	run_cmd chcon -R -t httpd_log_t /var/log/simplerisk
 }
 
 setup_suse(){
@@ -813,6 +826,7 @@ EOF
 	done
 
 	set_up_simplerisk 'wwwrun' "${1}"
+	set_up_simplerisk_log 'wwwrun'
 
 	print_status 'Restarting Apache to load the new configuration...'
 	run_cmd systemctl restart apache2
@@ -864,6 +878,9 @@ uninstall_ubuntu_debian(){
 	print_status 'Removing SimpleRisk application files...'
 	run_cmd_nobail rm -rf /var/www/simplerisk
 
+	print_status 'Removing SimpleRisk log directory...'
+	run_cmd_nobail rm -rf /var/log/simplerisk
+
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin"
 	run_cmd_nobail apt-get autoremove -y
@@ -902,6 +919,9 @@ uninstall_centos_rhel(){
 
 	print_status 'Removing SimpleRisk application files...'
 	run_cmd_nobail rm -rf /var/www/simplerisk
+
+	print_status 'Removing SimpleRisk log directory...'
+	run_cmd_nobail rm -rf /var/log/simplerisk
 
 	print_status 'Removing SimpleRisk Apache virtual host config...'
 	run_cmd_nobail rm -f /etc/httpd/sites-enabled/simplerisk.conf
@@ -944,6 +964,9 @@ uninstall_suse(){
 
 	print_status 'Removing SimpleRisk application files...'
 	run_cmd_nobail rm -rf /var/www/simplerisk
+
+	print_status 'Removing SimpleRisk log directory...'
+	run_cmd_nobail rm -rf /var/log/simplerisk
 
 	print_status 'Removing SimpleRisk Apache virtual host and SSL config...'
 	run_cmd_nobail rm -f /etc/apache2/vhosts.d/simplerisk.conf
