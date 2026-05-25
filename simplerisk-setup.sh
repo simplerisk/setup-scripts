@@ -299,12 +299,12 @@ set_up_database() {
 	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
 
 	print_status 'Setup the config.php file'
-	exec_cmd "cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_HOSTNAME', '\)__DB_HOSTNAME__/\1localhost/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_PORT', '\)__DB_PORT__/\13306/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_USERNAME', '\)__DB_USERNAME__/\1simplerisk/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)__DB_PASSWORD__/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_DATABASE', '\)__DB_DATABASE__/\1simplerisk/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd "sed -i \"s/\(USE_DATABASE_FOR_SESSIONS', '\)__USE_DATABASE_FOR_SESSIONS__/\1true/\" /var/www/simplerisk/includes/config.php"
 }
 
 set_php_settings() {
@@ -330,7 +330,11 @@ set_up_simplerisk() {
 	exec_cmd "cd /var/www && tar xvzf simplerisk-${2}.tgz"
 	run_cmd rm -f "/var/www/simplerisk-${2}.tgz"
 	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql -O database.sql"
+	exec_cmd "cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php"
+	exec_cmd "mkdir -p /var/log/simplerisk/"
+	exec_cmd "touch /var/log/simplerisk/simplerisk.log"
 	run_cmd chown -R "${1}:" /var/www/simplerisk
+	run_cmd chown -R "${1}:" /var/log/simplerisk
 }
 
 set_up_backup_cronjob() {
