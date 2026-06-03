@@ -724,16 +724,17 @@ setup_suse(){
 	exec_cmd 'zypper -n update'
 
 	if ! rpm -q mysql84-community-release >/dev/null 2>&1; then
-		print_status 'Adding the MySQL 8.4 LTS community repository...'
-		# Use the unversioned release RPM: since April 2024 it defaults to the
-		# 8.4 LTS subrepo (the old -1 pin could drift or mismatch the signing key).
+		print_status 'Adding the MySQL community repository...'
 		exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15.rpm'
-		# Import whatever signing key the repo actually declares. The MySQL key
-		# rotates, so a hardcoded key import causes "Signature verification failed
-		# for repomd.xml"; --gpg-auto-import-keys pulls the correct one.
+		# Import the MySQL package-signing key into the rpm keyring so package
+		# signatures verify; without this the install warns/fails with NOKEY.
+		exec_cmd "rpm --import $MYSQL_KEY_URL"
+		# The release RPM enables the newest LTS repo (currently 9.x) and leaves
+		# the 8.4 repo disabled. Force 8.4 LTS: enable the 8.4 repos and disable
+		# the 9.x ones (the disable is best-effort in case the alias changes).
+		exec_cmd 'zypper -n modifyrepo --enable mysql-8.4-lts-community mysql-tools-8.4-lts-community'
+		exec_cmd_nobail 'zypper -n modifyrepo --disable mysql-9.7-lts-community mysql-tools-9.7-lts-community mysql-innovation-community'
 		exec_cmd 'zypper -n --gpg-auto-import-keys refresh'
-		# Stay on 8.4 LTS: disable the innovation track (MySQL 9.x) if present.
-		exec_cmd_nobail 'zypper -n modifyrepo --disable mysql-innovation-community || true'
 	fi
 
 	print_status 'Installing Apache...'
@@ -746,12 +747,11 @@ setup_suse(){
 	exec_cmd 'systemctl start apache2'
 
 	print_status 'Installing MySQL 8.4 LTS...'
-	# SLES ships MariaDB, whose packages "provide" the mysql namespace and so
-	# conflict with mysql-community-server. Interactively zypper prompts which to
-	# keep; under -n it aborts (this is the step SLES installs were dying on).
-	# --allow-vendor-change --force-resolution applies the "replace MariaDB with
-	# MySQL" resolution non-interactively.
-	exec_cmd 'zypper -n install --allow-vendor-change --force-resolution mysql-community-server'
+	# SLES ships MariaDB, which "provides" the mysql namespace and conflicts with
+	# mysql-community-server; under -n zypper aborts (the step SLES installs died
+	# on). --allow-vendor-change --force-resolution applies the "replace MariaDB
+	# with MySQL" resolution; the <9 bound guarantees 8.4 LTS over any 9.x repo.
+	exec_cmd "zypper -n install --allow-vendor-change --force-resolution 'mysql-community-server<9'"
 
 	print_status 'Enabling MySQL on reboot...'
 	exec_cmd 'systemctl enable mysql'
