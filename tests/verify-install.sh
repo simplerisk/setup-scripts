@@ -39,10 +39,14 @@ check "cron script exists"                           test -f /var/www/simplerisk
 
 # ── config.php content ───────────────────────────────────────────────────────
 echo "--- config.php ---"
-check "SIMPLERISK_INSTALLED is set to true" \
-    grep -q "SIMPLERISK_INSTALLED', 'true'" /var/www/simplerisk/includes/config.php
-check "DB_PASSWORD is not the default literal 'simplerisk'" \
-    bash -c "! grep -q \"DB_PASSWORD', 'simplerisk'\" /var/www/simplerisk/includes/config.php"
+# Newer SimpleRisk ships config.sample.php (a template of __PLACEHOLDER__
+# tokens) and treats the existence of config.php as the install marker, so
+# there is no longer a SIMPLERISK_INSTALLED flag. Verify the installer
+# substituted the placeholders instead.
+check "config.php placeholders were substituted" \
+    bash -c "! grep -qE \"define[(][^)]*__[A-Z_]+__\" /var/www/simplerisk/includes/config.php"
+check "DB_PASSWORD is populated (not placeholder or default)" \
+    bash -c "! grep -qE \"DB_PASSWORD', '(__DB_PASSWORD__|simplerisk)'\" /var/www/simplerisk/includes/config.php"
 
 # ── Passwords file ───────────────────────────────────────────────────────────
 echo "--- /root/passwords.txt ---"
