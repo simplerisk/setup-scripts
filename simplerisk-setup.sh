@@ -707,10 +707,17 @@ setup_suse(){
 	print_status 'Populating zypper cache...'
 	exec_cmd 'zypper -n update'
 
-	if ! rpm -q mysql84-community-release; then
-		print_status 'Adding MySQL 8 repository...'
-		exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm'
-		exec_cmd "rpm --import $MYSQL_KEY_URL"
+	if ! rpm -q mysql84-community-release >/dev/null 2>&1; then
+		print_status 'Adding the MySQL 8.4 LTS community repository...'
+		# Use the unversioned release RPM: since April 2024 it defaults to the
+		# 8.4 LTS subrepo (the old -1 pin could drift or mismatch the signing key).
+		exec_cmd 'rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15.rpm'
+		# Import whatever signing key the repo actually declares. The MySQL key
+		# rotates, so a hardcoded key import causes "Signature verification failed
+		# for repomd.xml"; --gpg-auto-import-keys pulls the correct one.
+		exec_cmd 'zypper -n --gpg-auto-import-keys refresh'
+		# Stay on 8.4 LTS: disable the innovation track (MySQL 9.x) if present.
+		exec_cmd_nobail 'zypper -n modifyrepo --disable mysql-innovation-community || true'
 	fi
 
 	print_status 'Installing Apache...'
@@ -722,8 +729,13 @@ setup_suse(){
 	print_status 'Starting Apache...'
 	exec_cmd 'systemctl start apache2'
 
-	print_status 'Installing MySQL 8...'
-	exec_cmd 'zypper -n install mysql-community-server'
+	print_status 'Installing MySQL 8.4 LTS...'
+	# SLES ships MariaDB, whose packages "provide" the mysql namespace and so
+	# conflict with mysql-community-server. Interactively zypper prompts which to
+	# keep; under -n it aborts (this is the step SLES installs were dying on).
+	# --allow-vendor-change --force-resolution applies the "replace MariaDB with
+	# MySQL" resolution non-interactively.
+	exec_cmd 'zypper -n install --allow-vendor-change --force-resolution mysql-community-server'
 
 	print_status 'Enabling MySQL on reboot...'
 	exec_cmd 'systemctl enable mysql'
