@@ -315,9 +315,19 @@ set_up_database() {
 	exec_cmd_sensitive "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\"${password_flag:-}"
 	exec_cmd_sensitive "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
 
-	print_status 'Setting the SimpleRisk database password...'
-	exec_cmd_sensitive "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
-	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
+	print_status 'Writing the SimpleRisk configuration...'
+	# Newer config.php is a template of __PLACEHOLDER__ tokens (see
+	# includes/config.sample.php). SimpleRisk treats the presence of config.php
+	# as the install marker, so there is no longer a SIMPLERISK_INSTALLED flag.
+	# Passwords are alphanumeric (see create_random_password), so they are safe
+	# as sed replacement text.
+	local sr_config=/var/www/simplerisk/includes/config.php
+	exec_cmd "sed -i 's/__DB_HOSTNAME__/localhost/' $sr_config"
+	exec_cmd "sed -i 's/__DB_PORT__/3306/' $sr_config"
+	exec_cmd "sed -i 's/__DB_USERNAME__/simplerisk/' $sr_config"
+	exec_cmd_sensitive "sed -i 's/__DB_PASSWORD__/${MYSQL_SIMPLERISK_PASSWORD}/' $sr_config"
+	exec_cmd "sed -i 's/__DB_DATABASE__/simplerisk/' $sr_config"
+	exec_cmd "sed -i 's/__USE_DATABASE_FOR_SESSIONS__/true/' $sr_config"
 }
 
 set_php_settings() {
@@ -342,6 +352,12 @@ set_up_simplerisk() {
 	exec_cmd "cd /var/www && wget https://simplerisk-downloads.s3.amazonaws.com/public/bundles/simplerisk-${2}.tgz"
 	exec_cmd "cd /var/www && tar xvzf simplerisk-${2}.tgz"
 	exec_cmd "rm -f /var/www/simplerisk-${2}.tgz"
+	# Newer release bundles ship includes/config.sample.php (a template with
+	# __PLACEHOLDER__ tokens) instead of a ready-made includes/config.php.
+	# Create config.php from it; set_up_database substitutes the real values.
+	if [ -f /var/www/simplerisk/includes/config.sample.php ] && [ ! -f /var/www/simplerisk/includes/config.php ]; then
+		exec_cmd 'cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php'
+	fi
 	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql -O database.sql"
 	exec_cmd "chown -R ${1}: /var/www/simplerisk"
 }
