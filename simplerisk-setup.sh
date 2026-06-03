@@ -742,16 +742,11 @@ EOF
 
 	generate_passwords
 
-	# Generate the OpenSSL private key
-	exec_cmd 'openssl rand -hex 50 > /tmp/pass_openssl.txt'
-	exec_cmd 'openssl genrsa -des3 -passout file:/tmp/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key'
-	exec_cmd 'openssl rsa -passin file:/tmp/pass_openssl.txt -in /etc/apache2/ssl.key/simplerisk.pass.key -out /etc/apache2/ssl.key/simplerisk.key'
-
-	# Remove the original key file
-	exec_cmd 'rm /etc/apache2/ssl.key/simplerisk.pass.key /tmp/pass_openssl.txt'
+	# Generate the OpenSSL private key (OpenSSL 3 / FIPS compatible)
+	exec_cmd 'openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /etc/apache2/ssl.key/simplerisk.key'
 
 	# Generate the CSR
-	exec_cmd 'openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out  /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk"'
+	exec_cmd 'openssl req -new -key /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.csr/simplerisk.csr -subj "/CN=simplerisk"'
 
 	# Create the Certificate
 	exec_cmd 'openssl x509 -req -days 365 -in /etc/apache2/ssl.csr/simplerisk.csr -signkey /etc/apache2/ssl.key/simplerisk.key -out /etc/apache2/ssl.crt/simplerisk.crt'
@@ -812,8 +807,26 @@ EOF
 	print_status 'Removing the SimpleRisk database file...'
 	exec_cmd 'rm -r /var/www/simplerisk/database.sql'
 
+	print_status 'Installing cron...'
+	exec_cmd 'zypper -n install cron'
+
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
+
+	# SLES 15's default firewall is firewalld, but it is absent on minimal/JeOS
+	# and container images. Configure it only when it is actually installed;
+	# otherwise note it and continue rather than aborting under set -e.
+	if command -v firewall-cmd >/dev/null 2>&1; then
+		print_status 'Opening firewall for HTTP/HTTPS/SSH traffic...'
+		exec_cmd 'systemctl enable firewalld'
+		exec_cmd 'systemctl start firewalld'
+		for service in http https ssh; do
+			exec_cmd "firewall-cmd --permanent --zone=public --add-service=${service}"
+		done
+		exec_cmd 'firewall-cmd --reload'
+	else
+		print_status 'NOTE: firewalld is not installed; skipping firewall configuration. Open HTTP/HTTPS/SSH manually if a firewall is in use.'
+	fi
 
 	if [[ "${VER}" = 15* ]]; then
 		print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
@@ -935,6 +948,13 @@ uninstall_suse(){
 
 	print_status 'Removing MySQL repository...'
 	exec_cmd_nobail 'rpm -e mysql84-community-release-sl15 2>/dev/null || true'
+
+	print_status 'Removing firewall rules for SimpleRisk...'
+	if command -v firewall-cmd >/dev/null 2>&1; then
+		exec_cmd_nobail 'firewall-cmd --permanent --zone=public --remove-service=http'
+		exec_cmd_nobail 'firewall-cmd --permanent --zone=public --remove-service=https'
+		exec_cmd_nobail 'firewall-cmd --reload'
+	fi
 
 	print_status 'Removing MySQL password file...'
 	exec_cmd_nobail 'rm -f /root/passwords.txt'
