@@ -19,6 +19,13 @@ readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com
 setup (){
 	validate_args "${@:1}"
 
+	# When run via a pipe (e.g. curl | bash) there is no controlling terminal to
+	# prompt on, so default installs to headless. Uninstall is destructive and must
+	# still be explicitly confirmed with --yes, so it is deliberately excluded here.
+	if [ ! -t 0 ] && [ ! -v UNINSTALL ]; then
+		HEADLESS=y
+	fi
+
 	# Check root unless you only want to validate if the script works on the host
 	if [ ! -v VALIDATE_ONLY ]; then
 		check_root
@@ -198,6 +205,9 @@ validate_os_and_version(){
 perform_installation() {
 	local current_simplerisk_version
 	current_simplerisk_version=$(get_current_simplerisk_version)
+	if [ -z "${current_simplerisk_version}" ]; then
+		print_error_message "Could not retrieve the current SimpleRisk version. Check your network connectivity and try again."
+	fi
 
 	case "${SETUP_TYPE:-}" in
 		debian) setup_ubuntu_debian "$current_simplerisk_version";;
@@ -250,6 +260,22 @@ exec_cmd_nobail() {
 	bash -c "${1} ${no_log}"
 }
 
+exec_cmd_sensitive() {
+	exec_cmd_nobail_sensitive "${1}" || bail
+}
+
+# Same as exec_cmd, but never echoes the command — use for anything that embeds
+# a password so credentials do not leak into --debug output or CI logs.
+exec_cmd_nobail_sensitive() {
+	local no_log=""
+	if [ ! -v DEBUG ]; then
+		no_log='> /dev/null 2>&1'
+	fi
+
+	echo "+ [redacted]"
+	bash -c "${1} ${no_log}"
+}
+
 create_random_password() {
 	local char_pattern='A-Za-z0-9'
 	if [ -n "${2:-}" ]; then
@@ -279,18 +305,18 @@ set_up_database() {
 		initial_root_password=$(grep Note "$1" | awk -F " " '{print $NF}')
 		local temp_password
 		temp_password="$(create_random_password 100 y)"
-		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=\"${initial_root_password}\" --connect-expired-password"
+		exec_cmd_sensitive "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=\"${initial_root_password}\" --connect-expired-password"
 		password_flag=" --password='${temp_password}'"
-		exec_cmd "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\"$password_flag"
+		exec_cmd_sensitive "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\"$password_flag"
 	fi
-	exec_cmd "mysql -uroot mysql -e 'CREATE DATABASE simplerisk'${password_flag:-}"
-	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\"${password_flag:-}"
-	exec_cmd "mysql -uroot simplerisk -e '\\. /var/www/simplerisk/database.sql'${password_flag:-}"
-	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\"${password_flag:-}"
-	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
+	exec_cmd_sensitive "mysql -uroot mysql -e 'CREATE DATABASE simplerisk'${password_flag:-}"
+	exec_cmd_sensitive "mysql -uroot mysql -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\"${password_flag:-}"
+	exec_cmd_sensitive "mysql -uroot simplerisk -e '\\. /var/www/simplerisk/database.sql'${password_flag:-}"
+	exec_cmd_sensitive "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\"${password_flag:-}"
+	exec_cmd_sensitive "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
 
 	print_status 'Setting the SimpleRisk database password...'
-	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
+	exec_cmd_sensitive "sed -i \"s/\(DB_PASSWORD', '\)simplerisk/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(SIMPLERISK_INSTALLED', '\)false/\1true/\" /var/www/simplerisk/includes/config.php"
 }
 
