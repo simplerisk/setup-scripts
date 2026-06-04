@@ -746,6 +746,23 @@ setup_suse(){
 	print_status 'Starting Apache...'
 	exec_cmd 'systemctl start apache2'
 
+	# --- AppArmor (SLES default MAC) ---
+	# Stock SLES ships no AppArmor profile for Apache, but a hardened/STIG/CIS
+	# baseline often adds one in enforce mode, which blocks SimpleRisk's writes
+	# (uploads, log dir, config.php). If an Apache profile is loaded, disable it
+	# so Apache runs unconfined. No-op when AppArmor is off or no profile exists.
+	if grep -qx Y /sys/module/apparmor/parameters/enabled 2>/dev/null; then
+		for prof in /etc/apparmor.d/*httpd* /etc/apparmor.d/*apache*; do
+			[ -e "$prof" ] || continue
+			print_status "Disabling AppArmor profile $(basename "$prof") so Apache runs unconfined..."
+			exec_cmd_nobail 'mkdir -p /etc/apparmor.d/disable'
+			exec_cmd_nobail "ln -sf '$prof' /etc/apparmor.d/disable/"
+			if command -v apparmor_parser >/dev/null 2>&1; then
+				exec_cmd_nobail "apparmor_parser -R '$prof'"
+			fi
+		done
+	fi
+
 	print_status 'Installing MySQL 8.4 LTS...'
 	# SLES ships MariaDB, which "provides" the mysql namespace and conflicts with
 	# mysql-community-server; under -n zypper aborts (the step SLES installs died
@@ -995,6 +1012,18 @@ uninstall_suse(){
 	exec_cmd_nobail 'rm -f /etc/apache2/ssl.csr/simplerisk.csr'
 	exec_cmd_nobail 'rm -f /etc/apache2/ssl.crt/simplerisk.crt'
 	exec_cmd_nobail "sed -i '/LoadModule rewrite_module.*mod_rewrite.so/d' /etc/apache2/loadmodule.conf"
+
+	# Re-enable any Apache AppArmor profile that the installer disabled, to
+	# restore the system's original confinement posture.
+	if grep -qx Y /sys/module/apparmor/parameters/enabled 2>/dev/null; then
+		for prof in /etc/apparmor.d/*httpd* /etc/apparmor.d/*apache*; do
+			[ -e "$prof" ] || continue
+			exec_cmd_nobail "rm -f /etc/apparmor.d/disable/$(basename "$prof")"
+			if command -v apparmor_parser >/dev/null 2>&1; then
+				exec_cmd_nobail "apparmor_parser -r '$prof'"
+			fi
+		done
+	fi
 
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
