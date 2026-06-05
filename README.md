@@ -8,7 +8,7 @@
 - Debian 12, 13
 - CentOS Stream 9, 10
 - Red Hat Enterprise Linux (RHEL) 9, 10
-- SUSE Linux Enterprise Server (SLES) higher than 15.5
+- SUSE Linux Enterprise Server (SLES) 15.x
 
 ## Instructions
 

@@ -8,7 +8,7 @@ readonly CENTOS_STREAM_OSVAR='CentOS Stream'
 readonly RHEL_OSVAR='Red Hat Enterprise Linux'
 readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
-readonly SLES_15_SUPPORTED_SP="15.7"
+readonly SLES_15_SUPPORTED_SP="15"
 
 readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2025'
 readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html
@@ -157,12 +157,22 @@ validate_os_and_version(){
 				SETUP_TYPE=rhel
 			fi;;
 		"${SLES_OSVAR}")
-			if [[ "${VER}" = "$SLES_15_SUPPORTED_SP" ]]; then
+			if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
 				valid=y
 				local php_module
 				# Grab module where php8 is available
 				php_module=$(zypper search-packages php8 | awk '/^php8[[:space:]]/ { sub(/\(.*/, ""); sub(/^php8[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); print }')
-				if ! sudo suseconnect --list-extensions | grep -F "$php_module" | grep -q "Activated"; then
+				# Check that the PHP module is active. suseconnect reports
+				# "Activated" on self-registered systems and "Installed" on
+				# SUSE Manager-managed systems; the status line follows the
+				# module name line in the output, so use grep -A1 to capture
+				# both lines before checking.
+				# Guard against an empty php_module — an empty -F pattern would
+				# match every line and make the check a silent no-op.
+				if [ -z "${php_module}" ]; then
+					print_error_message "Could not detect the PHP 8 module name via zypper. Ensure the Web and Scripting Module is activated in your SLES subscription."
+				fi
+				if ! sudo suseconnect --list-extensions | grep -A1 -F "$php_module" | grep -qE "Activated|Installed"; then
 					print_error_message "$php_module is not enabled on your subscription. Please enable it before running this installer."
 				fi
 				if [ ! -v HEADLESS ]; then
@@ -260,13 +270,19 @@ run_cmd_nobail() {
 run_cmd() { run_cmd_nobail "$@" || bail; }
 
 create_random_password() {
-	local char_pattern='A-Za-z0-9'
-	if [ -n "${2:-}" ]; then
-		char_pattern=$char_pattern'!?^@%'
-	fi
-	# Disabling useless echo (mandatory with set u)
-	# shellcheck disable=SC2005
-	echo "$(< /dev/urandom tr -dc "${char_pattern}" | head -c"${1:-20}")"
+	# Generate a password that satisfies MySQL MEDIUM validate_password policy:
+	# at least one uppercase, one lowercase, one digit, one special character,
+	# and a minimum length of 20 (well above the 8-char LOW/MEDIUM threshold).
+	# $1 = total length (default 20); $2 = unused (kept for call-site compat)
+	local length="${1:-20}"
+	local upper lower digit special rest
+	upper="$(< /dev/urandom tr -dc 'A-Z'    | head -c1)"
+	lower="$(< /dev/urandom tr -dc 'a-z'    | head -c1)"
+	digit="$(< /dev/urandom tr -dc '0-9'    | head -c1)"
+	special="$(< /dev/urandom tr -dc '!?^@%' | head -c1)"
+	rest="$(< /dev/urandom tr -dc 'A-Za-z0-9!?^@%' | head -c$(( length - 4 )))"
+	# Shuffle so the guaranteed chars aren't always at the front
+	echo "${upper}${lower}${digit}${special}${rest}" | fold -w1 | shuf | tr -d '\n'
 }
 
 generate_passwords() {
@@ -290,7 +306,12 @@ set_up_database() {
 		temp_password="$(create_random_password 100 y)"
 		exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${temp_password}'\" --password=\"${initial_root_password}\" --connect-expired-password"
 		password_flag=" --password='${temp_password}'"
-		exec_cmd "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\"$password_flag"
+		# Lower password policy to LOW so our generated passwords are accepted.
+		# MySQL 8.x exposes this as the component variable validate_password.policy;
+		# the 5.7-era validate_password_policy was removed and errors (1193) on 8.4.
+		# Tolerate the component being absent: a bare exec_cmd_nobail still aborts
+		# under set -e on non-zero, so '|| true' makes the failure truly graceful.
+		exec_cmd_nobail "mysql -u root mysql -e \"SET GLOBAL validate_password.policy = LOW;\"$password_flag" || true
 	fi
 	exec_cmd "mysql -uroot mysql -e 'CREATE DATABASE simplerisk'${password_flag:-}"
 	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\"${password_flag:-}"
@@ -424,9 +445,9 @@ drop_simplerisk_database() {
 	local root_password
 	root_password=$(get_mysql_root_password)
 	if [ -n "${root_password}" ]; then
-		exec_cmd_nobail "mysql -uroot --password='${root_password}' -e \"DROP DATABASE IF EXISTS simplerisk\""
-		exec_cmd_nobail "mysql -uroot --password='${root_password}' -e \"DROP USER IF EXISTS 'simplerisk'@'localhost'\""
-		exec_cmd_nobail "mysql -uroot --password='${root_password}' -e \"FLUSH PRIVILEGES\""
+		MYSQL_PWD="${root_password}" mysql -uroot -e "DROP DATABASE IF EXISTS simplerisk" 2>/dev/null || true
+		MYSQL_PWD="${root_password}" mysql -uroot -e "DROP USER IF EXISTS 'simplerisk'@'localhost'" 2>/dev/null || true
+		MYSQL_PWD="${root_password}" mysql -uroot -e "FLUSH PRIVILEGES" 2>/dev/null || true
 	else
 		print_status 'WARNING: Could not find MySQL root password in /root/passwords.txt. Skipping database removal.'
 		print_status 'You may need to manually drop the simplerisk database and user.'
@@ -623,9 +644,16 @@ setup_centos_rhel(){
 	# mysql-community-server (same files).  Exclude it explicitly so DNF does
 	# not pull it in as a weak dependency.  The exclude is a no-op on el9/el8
 	# where mysql8.4-server does not exist in any enabled repo.
-	# The mysql84-community-release RPM also enables a mysql-9.x-lts-community
-	# repo; disable it so DNF resolves mysql-community-server from 8.4, not 9.x.
-	run_cmd dnf install -y mysql-community-server --exclude 'mariadb*' --exclude 'mysql8.4*' --disablerepo='mysql-9*'
+	#
+	# Recent mysql84-community-release RPMs (el10-3, el9-4+) default-enable the
+	# newest LTS sub-repo (mysql-9.7-lts-community) and leave mysql-8.4-lts-community
+	# DISABLED for fresh installs (MySQL bug #120315).  A bare install therefore
+	# resolves 9.x, and the old `--disablerepo=mysql-9*` left NO server repo enabled
+	# ("No match for argument: mysql-community-server").  Pin to 8.4 explicitly:
+	# disable every mysql sub-repo, then re-enable only 8.4 LTS.  dnf applies these
+	# in order (last wins), so the enable takes effect.  BaseOS/AppStream/EPEL/remi
+	# stay enabled for dependency resolution.
+	run_cmd dnf install -y mysql-community-server --exclude 'mariadb*' --exclude 'mysql8.4*' --disablerepo='mysql-*' --enablerepo='mysql-8.4-lts-community'
 
 	print_status 'Enabling and starting MySQL database server...'
 	run_cmd systemctl enable mysqld
@@ -738,7 +766,7 @@ setup_suse(){
 	print_status 'Populating zypper cache...'
 	run_cmd zypper -n update
 
-	if ! rpm -q mysql84-community-release; then
+	if ! rpm -q mysql84-community-release > /dev/null 2>&1; then
 		print_status 'Adding MySQL 8 repository...'
 		run_cmd rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm
 		run_cmd rpm --import "$MYSQL_KEY_URL"
@@ -804,7 +832,7 @@ setup_suse(){
 	# silently missing.
 	run_cmd zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php8-dom php8-openssl php8-tokenizer php8-ctype php8-xmlreader php8-xmlwriter
 
-	if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
+	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
 		print_status 'Enabling PHP and Apache modules...'
 		for module in php8 rewrite ssl mod_ssl; do
 			run_cmd a2enmod "$module"
@@ -812,12 +840,13 @@ setup_suse(){
 	fi
 
 	print_status 'Enabling Rewrite Module for Apache...'
-	if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
-		echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
+	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
+		grep -qF 'mod_rewrite.so' /etc/apache2/loadmodule.conf 2>/dev/null || \
+			echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
 	fi
 
 	print_status 'Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert'
-	echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf
+	grep -qxF 'Listen 443' /etc/apache2/vhosts.d/simplerisk.conf 2>/dev/null || echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf
 	cat << EOF >> /etc/apache2/vhosts.d/simplerisk.conf
 <VirtualHost *:80>
 	DocumentRoot "/var/www/simplerisk/"
@@ -879,6 +908,14 @@ EOF
 
 	set_php_settings /etc/php8/apache2/php.ini
 
+	# SLES ships its CA bundle at /etc/ssl/ca-bundle.pem rather than the
+	# Debian/RHEL paths that PHP's curl probes by default. Without this,
+	# PHP curl calls (update feeds, license checks, etc.) fail with SSL
+	# certificate verification errors.
+	print_status 'Configuring PHP curl CA bundle path...'
+	exec_cmd "sed -i 's|;*\s*curl\.cainfo\s*=.*|curl.cainfo = /etc/ssl/ca-bundle.pem|' /etc/php8/apache2/php.ini"
+	exec_cmd "sed -i 's|;*\s*openssl\.cafile\s*=.*|openssl.cafile = /etc/ssl/ca-bundle.pem|' /etc/php8/apache2/php.ini"
+
 	print_status 'Specifying the MySQL socket path...'
 	for extension in mysqli pdo_mysql; do
 		exec_cmd "sed -i 's|\($extension.default_socket\).*|\1=/var/lib/mysql/mysql.sock|' /etc/php8/apache2/php.ini"
@@ -890,18 +927,14 @@ EOF
 	run_cmd systemctl restart apache2
 
 	print_status 'Configuring MySQL...'
-	if [[ "${VER}" = 15* ]]; then
+	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
 		exec_cmd "sed -i 's/\(\[mysqld\]\)/\1\nsql_mode=NO_ENGINE_SUBSTITUTION/g' /etc/my.cnf"
 	fi
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
 	run_cmd sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf
 	set_mysql_password_policy /etc/my.cnf
 
-	if [[ "${VER}" = 15* ]]; then
-		set_up_database	/var/log/mysql/mysqld.log
-	else
-		set_up_database
-	fi
+	set_up_database /var/log/mysql/mysqld.log
 
 	print_status 'Restarting MySQL to load the new configuration...'
 	run_cmd systemctl restart mysql
@@ -919,7 +952,7 @@ EOF
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
 
-	if [[ "${VER}" = 15* ]]; then
+	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
 		print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
 	fi
 }
@@ -941,8 +974,9 @@ uninstall_ubuntu_debian(){
 	run_cmd_nobail service mysql stop
 	run_cmd_nobail service sendmail stop
 
-	print_status 'Removing SimpleRisk application files...'
+	print_status 'Removing SimpleRisk application and log files...'
 	run_cmd_nobail rm -rf /var/www/simplerisk
+	run_cmd_nobail rm -rf /var/log/simplerisk
 
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin"
@@ -980,8 +1014,9 @@ uninstall_centos_rhel(){
 	run_cmd_nobail systemctl disable mysqld
 	run_cmd_nobail systemctl stop sendmail
 
-	print_status 'Removing SimpleRisk application files...'
+	print_status 'Removing SimpleRisk application and log files...'
 	run_cmd_nobail rm -rf /var/www/simplerisk
+	run_cmd_nobail rm -rf /var/log/simplerisk
 
 	print_status 'Removing SimpleRisk Apache virtual host config...'
 	run_cmd_nobail rm -f /etc/httpd/sites-enabled/simplerisk.conf
@@ -1022,8 +1057,9 @@ uninstall_suse(){
 	run_cmd_nobail systemctl stop mysql
 	run_cmd_nobail systemctl disable mysql
 
-	print_status 'Removing SimpleRisk application files...'
+	print_status 'Removing SimpleRisk application and log files...'
 	run_cmd_nobail rm -rf /var/www/simplerisk
+	run_cmd_nobail rm -rf /var/log/simplerisk
 
 	print_status 'Removing SimpleRisk Apache virtual host and SSL config...'
 	run_cmd_nobail rm -f /etc/apache2/vhosts.d/simplerisk.conf
@@ -1049,8 +1085,9 @@ uninstall_suse(){
 	exec_cmd_nobail "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
 	run_cmd_nobail zypper -n autoremove
 
-	print_status 'Removing MySQL repository...'
+	print_status 'Removing MySQL repository and drop-in config...'
 	exec_cmd_nobail 'rpm -e mysql84-community-release-sl15 2>/dev/null || true'
+	run_cmd_nobail rm -f /etc/my.cnf.d/zz-simplerisk.cnf
 
 	print_status 'Removing MySQL password file...'
 	run_cmd_nobail rm -f /root/passwords.txt
