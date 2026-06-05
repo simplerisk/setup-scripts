@@ -299,12 +299,36 @@ set_up_database() {
 	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
 
 	print_status 'Setup the config.php file'
-	exec_cmd "sed -i \"s/\(DB_HOSTNAME', '\)__DB_HOSTNAME__/\1localhost/\" /var/www/simplerisk/includes/config.php"
+	# Use 127.0.0.1 (TCP) not 'localhost' (Unix socket). The config.sample.php
+	# comment explicitly notes this: 'localhost' forces a socket connection
+	# which fails in Docker and on systems where PHP's default socket path
+	# doesn't match MySQL's actual socket path (e.g. RHEL/CentOS differs from
+	# Debian). 127.0.0.1 works reliably everywhere.
+	exec_cmd "sed -i \"s/\(DB_HOSTNAME', '\)__DB_HOSTNAME__/\1127.0.0.1/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_PORT', '\)__DB_PORT__/\13306/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_USERNAME', '\)__DB_USERNAME__/\1simplerisk/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_PASSWORD', '\)__DB_PASSWORD__/\1${MYSQL_SIMPLERISK_PASSWORD}/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(DB_DATABASE', '\)__DB_DATABASE__/\1simplerisk/\" /var/www/simplerisk/includes/config.php"
 	exec_cmd "sed -i \"s/\(USE_DATABASE_FOR_SESSIONS', '\)__USE_DATABASE_FOR_SESSIONS__/\1true/\" /var/www/simplerisk/includes/config.php"
+}
+
+# Persist the MySQL validate_password policy into the [mysqld] section of the
+# given option file. Written as a separate [mysqld] group appended to the file
+# (MySQL merges groups). The 'loose-' prefix means a server that does not have
+# the validate_password component loaded still starts (the values apply when it
+# is present, which it is by default on MySQL community 8.x).
+# $1 = path to a MySQL option file that mysqld reads.
+set_mysql_password_policy() {
+	cat >> "$1" <<'EOF'
+
+[mysqld]
+loose-validate_password.policy=MEDIUM
+loose-validate_password.length=20
+loose-validate_password.mixed_case_count=1
+loose-validate_password.number_count=1
+loose-validate_password.special_char_count=0
+loose-validate_password.check_user_name=ON
+EOF
 }
 
 set_php_settings() {
@@ -537,6 +561,7 @@ setup_ubuntu_debian(){
 
 	print_status 'Configuring MySQL...'
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/mysql/mysql.conf.d/mysqld.cnf"
+	set_mysql_password_policy /etc/mysql/mysql.conf.d/mysqld.cnf
 	set_up_database
 
 	print_status 'Restarting MySQL to load the new configuration...'
@@ -659,6 +684,7 @@ EOF
 	# for MySQL 8.4+ where config-file precedence changed.
 	printf '[mysqld]\nsql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION\n' \
 		> /etc/my.cnf.d/zz-simplerisk.cnf
+	set_mysql_password_policy /etc/my.cnf.d/zz-simplerisk.cnf
 
 	print_status 'Restarting MySQL to load the new configuration...'
 	run_cmd systemctl restart mysqld
@@ -668,6 +694,13 @@ EOF
 
 	print_status 'Removing the SimpleRisk database file...'
 	run_cmd rm -r /var/www/simplerisk/database.sql
+
+	# cronie provides the crontab binary and the crond daemon that actually runs
+	# SimpleRisk's cron job; without it the crontab entry is written but never run.
+	print_status 'Installing and enabling cron...'
+	run_cmd dnf -y install cronie
+	run_cmd systemctl enable --now crond
+
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
 
@@ -709,6 +742,15 @@ setup_suse(){
 		print_status 'Adding MySQL 8 repository...'
 		run_cmd rpm -Uvh https://dev.mysql.com/get/mysql84-community-release-sl15-1.noarch.rpm
 		run_cmd rpm --import "$MYSQL_KEY_URL"
+		# The mysql84 release RPM enables the 8.4 LTS repo by default; pin it
+		# defensively in case a future RPM enables a 9.x repo instead. These are
+		# best-effort — the named repos may not exist (the -1 RPM doesn't create
+		# the 9.x ones), and a bare run_cmd_nobail still trips set -e on a non-zero
+		# exit, so '|| true' keeps a missing repo from aborting the run. The real
+		# guarantee that we land on 8.4 is the 'mysql-community-server<9' bound below.
+		run_cmd_nobail zypper -n modifyrepo --enable mysql-8.4-lts-community mysql-tools-8.4-lts-community || true
+		run_cmd_nobail zypper -n modifyrepo --disable mysql-9.7-lts-community mysql-tools-9.7-lts-community mysql-innovation-community || true
+		run_cmd zypper -n --gpg-auto-import-keys refresh
 	fi
 
 	print_status 'Installing Apache...'
@@ -720,8 +762,29 @@ setup_suse(){
 	print_status 'Starting Apache...'
 	run_cmd systemctl start apache2
 
-	print_status 'Installing MySQL 8...'
-	run_cmd zypper -n install mysql-community-server
+	# --- AppArmor (SLES default MAC) ---
+	# Stock SLES ships no Apache AppArmor profile, but hardened/STIG/CIS baselines
+	# often add one in enforce mode, which blocks SimpleRisk's writes (uploads,
+	# logs, config.php). If a loaded Apache profile exists, disable it so Apache
+	# runs unconfined. No-op when AppArmor is off or no such profile exists.
+	if grep -qx Y /sys/module/apparmor/parameters/enabled 2>/dev/null; then
+		for prof in /etc/apparmor.d/*httpd* /etc/apparmor.d/*apache*; do
+			[ -e "$prof" ] || continue
+			print_status "Disabling AppArmor profile $(basename "$prof") so Apache runs unconfined..."
+			run_cmd_nobail mkdir -p /etc/apparmor.d/disable || true
+			run_cmd_nobail ln -sf "$prof" /etc/apparmor.d/disable/ || true
+			if command -v apparmor_parser >/dev/null 2>&1; then
+				run_cmd_nobail apparmor_parser -R "$prof" || true
+			fi
+		done
+	fi
+
+	print_status 'Installing MySQL 8.4 LTS...'
+	# SLES ships MariaDB, which "provides" the mysql namespace and conflicts with
+	# mysql-community-server; under -n zypper aborts. --allow-vendor-change
+	# --force-resolution applies the "replace MariaDB with MySQL" resolution; the
+	# <9 bound keeps us on 8.4 LTS even if a 9.x repo is still enabled.
+	run_cmd zypper -n install --allow-vendor-change --force-resolution 'mysql-community-server<9'
 
 	print_status 'Enabling MySQL on reboot...'
 	run_cmd systemctl enable mysql
@@ -730,7 +793,16 @@ setup_suse(){
 	run_cmd systemctl start mysql
 
 	print_status 'Installing PHP 8...'
-	run_cmd zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php-xml
+	# On SUSE several PHP extensions are separate packages (on Debian/RHEL they
+	# ship inside the base PHP package), so SimpleSAMLphp/SAML breaks on SLES
+	# while working elsewhere. Required by the bundled SimpleSAMLphp 2.x + its
+	# Symfony stack: php8-dom (XML), php8-openssl (signature verification),
+	# php8-tokenizer (Symfony routing attribute loader — without it SAML throws
+	# "The Tokenizer extension is required for the routing attribute loader"),
+	# php8-ctype, php8-xmlreader, php8-xmlwriter. Note 'php-xml' does not exist
+	# on SUSE, and SimpleRisk's healthcheck only flags dom, so the others were
+	# silently missing.
+	run_cmd zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php8-dom php8-openssl php8-tokenizer php8-ctype php8-xmlreader php8-xmlwriter
 
 	if [ "${VER}" = "${SLES_15_SUPPORTED_SP}" ]; then
 		print_status 'Enabling PHP and Apache modules...'
@@ -823,6 +895,7 @@ EOF
 	fi
 	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
 	run_cmd sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf
+	set_mysql_password_policy /etc/my.cnf
 
 	if [[ "${VER}" = 15* ]]; then
 		set_up_database	/var/log/mysql/mysqld.log
@@ -835,6 +908,13 @@ EOF
 
 	print_status 'Removing the SimpleRisk database file...'
 	run_cmd rm -r /var/www/simplerisk/database.sql
+
+	# The cron package provides the crontab binary and the cron daemon that
+	# actually runs SimpleRisk's cron job; without it the crontab entry is
+	# written but never executed.
+	print_status 'Installing and enabling cron...'
+	run_cmd zypper -n install cron
+	run_cmd systemctl enable --now cron
 
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
@@ -952,6 +1032,18 @@ uninstall_suse(){
 	run_cmd_nobail rm -f /etc/apache2/ssl.csr/simplerisk.csr
 	run_cmd_nobail rm -f /etc/apache2/ssl.crt/simplerisk.crt
 	run_cmd_nobail sed -i '/LoadModule rewrite_module.*mod_rewrite.so/d' /etc/apache2/loadmodule.conf
+
+	# Re-enable any Apache AppArmor profile the installer disabled, restoring the
+	# system's original confinement posture.
+	if grep -qx Y /sys/module/apparmor/parameters/enabled 2>/dev/null; then
+		for prof in /etc/apparmor.d/*httpd* /etc/apparmor.d/*apache*; do
+			[ -e "$prof" ] || continue
+			run_cmd_nobail rm -f "/etc/apparmor.d/disable/$(basename "$prof")" || true
+			if command -v apparmor_parser >/dev/null 2>&1; then
+				run_cmd_nobail apparmor_parser -r "$prof" || true
+			fi
+		done
+	fi
 
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
