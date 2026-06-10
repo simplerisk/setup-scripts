@@ -5,7 +5,7 @@
 - Ubuntu LTS 22.04, and 24.04
   - Although it is possible to install on non-LTS versions in between the two most recent LTS versions or above the most
     recent version specified above, we do not support them officially
-- Debian 12, 13
+- Debian 13
 - CentOS Stream 9, 10
 - Red Hat Enterprise Linux (RHEL) 9, 10
 - SUSE Linux Enterprise Server (SLES) 15.x

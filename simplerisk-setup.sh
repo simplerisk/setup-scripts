@@ -142,7 +142,7 @@ validate_os_and_version(){
 				SETUP_TYPE=debian
 			fi;;
 		"${DEBIAN_OSVAR}")
-			if [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
+			if [ "${VER}" = '13' ]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
