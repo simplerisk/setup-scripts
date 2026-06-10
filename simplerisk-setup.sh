@@ -375,9 +375,9 @@ set_up_simplerisk() {
 	exec_cmd "cd /var/www && tar xvzf simplerisk-${2}.tgz"
 	run_cmd rm -f "/var/www/simplerisk-${2}.tgz"
 	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql -O database.sql"
-	exec_cmd "cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php"
-	exec_cmd "mkdir -p /var/log/simplerisk/"
-	exec_cmd "touch /var/log/simplerisk/simplerisk.log"
+	run_cmd cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php
+	run_cmd mkdir -p /var/log/simplerisk/
+	run_cmd touch /var/log/simplerisk/simplerisk.log
 	run_cmd chown -R "${1}:" /var/www/simplerisk
 	run_cmd chown -R "${1}:" /var/log/simplerisk
 }
@@ -867,6 +867,9 @@ EOF
 
 	generate_passwords
 
+	# Ensure SSL directories exist before writing key/cert files
+	run_cmd mkdir -p /etc/apache2/ssl.key /etc/apache2/ssl.csr /etc/apache2/ssl.crt
+
 	# Generate the OpenSSL private key
 	exec_cmd 'openssl rand -hex 50 > /tmp/pass_openssl.txt'
 	run_cmd openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -aes-256-cbc -pass file:/tmp/pass_openssl.txt -out /etc/apache2/ssl.key/simplerisk.pass.key
@@ -927,10 +930,11 @@ EOF
 	run_cmd systemctl restart apache2
 
 	print_status 'Configuring MySQL...'
-	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
-		exec_cmd "sed -i 's/\(\[mysqld\]\)/\1\nsql_mode=NO_ENGINE_SUBSTITUTION/g' /etc/my.cnf"
-	fi
-	exec_cmd "sed -i '$ a sql-mode=\"NO_ENGINE_SUBSTITUTION\"' /etc/my.cnf"
+	# Write sql_mode to a drop-in file so it takes precedence and is not
+	# duplicated across /etc/my.cnf.  Also strip STRICT_TRANS_TABLES from
+	# any existing entries in the base config.
+	printf '[mysqld]\nsql_mode=NO_ENGINE_SUBSTITUTION\n' \
+		> /etc/my.cnf.d/zz-simplerisk.cnf
 	run_cmd sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf
 	set_mysql_password_policy /etc/my.cnf
 
@@ -952,7 +956,16 @@ EOF
 	print_status 'Setting up Backup cronjob...'
 	set_up_backup_cronjob
 
-	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
+	print_status 'Installing and enabling firewall...'
+	run_cmd zypper -n install firewalld
+	run_cmd systemctl enable firewalld
+	run_cmd systemctl start firewalld
+	for service in http https ssh; do
+		run_cmd firewall-cmd --permanent --zone=public "--add-service=${service}"
+	done
+	run_cmd firewall-cmd --reload
+
+	if [[ "${VER}" = 15* ]]; then
 		print_status 'NOTE: SLES 15 does not have sendmail available on its repositories. You will need to configure postfix to be able to send emails.'
 	fi
 }
@@ -1088,6 +1101,11 @@ uninstall_suse(){
 	print_status 'Removing MySQL repository and drop-in config...'
 	exec_cmd_nobail 'rpm -e mysql84-community-release-sl15 2>/dev/null || true'
 	run_cmd_nobail rm -f /etc/my.cnf.d/zz-simplerisk.cnf
+
+	print_status 'Removing firewall rules for SimpleRisk...'
+	run_cmd_nobail firewall-cmd --permanent --zone=public --remove-service=http
+	run_cmd_nobail firewall-cmd --permanent --zone=public --remove-service=https
+	run_cmd_nobail firewall-cmd --reload
 
 	print_status 'Removing MySQL password file...'
 	run_cmd_nobail rm -f /root/passwords.txt
