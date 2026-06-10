@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-- Ubuntu LTS 22.04, and 24.04
+- Ubuntu LTS 22.04, 24.04, and 25.x
   - Although it is possible to install on non-LTS versions in between the two most recent LTS versions or above the most
     recent version specified above, we do not support them officially
 - Debian 13
@@ -20,14 +20,16 @@ Run as root or insert `sudo -E` before `bash`:
 ## `--help`
 
 ```
-Script to set up SimpleRisk on a server.
+Script to set up or uninstall SimpleRisk on a server.
 
-./simplerisk-setup [-d|--debug] [-n|--no-assistance] [-h|--help] [--validate-os-only]
+./simplerisk-setup [-d|--debug] [--yes] [-h|--help] [--uninstall]
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
--n|--no-assistance:    Runs the script in headless mode (will assume yes on anything)
 -t|--testing:          Picks the current testing version
---validate-os-only:    Only validates if the current host (OS and version) are supported by the script. This option does not require running the script as superuser.
+--uninstall:           Removes SimpleRisk and all associated packages, services, and data
+                         (Apache/httpd, MySQL, PHP, sendmail/postfix, firewall rules).
+                         WARNING: This action is irreversible and will destroy all SimpleRisk data.
+--yes:                 Will answer yes on every question (Use it carefully)
 -h|--help:             Shows instructions on how to use this script
 ```
