@@ -51,9 +51,6 @@ validate_args(){
 			-d|--debug)
 				DEBUG=y
 				shift;;
-			-t|--testing)
-				TESTING=y
-				shift;;
 			--uninstall)
 				UNINSTALL=y
 				shift;;
@@ -396,7 +393,7 @@ set_up_simplerisk_log() {
 }
 
 get_current_simplerisk_version() {
-	curl -sL "https://updates${TESTING:+-test}.simplerisk.com/releases.xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2
+	curl -sL "https://updates.simplerisk.com/releases.xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2
 }
 
 get_installed_php_version() {
@@ -427,7 +424,6 @@ Script to set up or uninstall SimpleRisk on a server.
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
--t|--testing:          Picks the current testing version
 --uninstall:           Removes SimpleRisk and all associated packages, services, and data
                          (Apache/httpd, MySQL, PHP, sendmail/postfix, firewall rules).
                          WARNING: This action is irreversible and will destroy all SimpleRisk data.

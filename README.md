@@ -26,7 +26,6 @@ Script to set up or uninstall SimpleRisk on a server.
 
 Flags:
 -d|--debug:            Shows the output of the commands being run by this script
--t|--testing:          Picks the current testing version
 --uninstall:           Removes SimpleRisk and all associated packages, services, and data
                          (Apache/httpd, MySQL, PHP, sendmail/postfix, firewall rules).
                          WARNING: This action is irreversible and will destroy all SimpleRisk data.
