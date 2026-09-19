@@ -14,15 +14,23 @@ unit="${args[1]%.service}"
 start_mysqld() {
     mysqladmin ping --silent >/dev/null 2>&1 && return 0   # already running
     mkdir -p /var/run/mysqld && chown mysql:mysql /var/run/mysqld 2>/dev/null || true
-    touch /var/log/mysqld.log && chown mysql:mysql /var/log/mysqld.log 2>/dev/null || true
+    # setup_suse() passes /var/log/mysql/mysqld.log to set_up_database(),
+    # matching the package's own my.cnf `log-error=` directive - the
+    # directory doesn't exist without a live systemd-tmpfiles, so mysqld
+    # falls back to logging elsewhere and set_up_database's grep for the
+    # startup temp-password line fails ("No such file or directory"),
+    # aborting the rest of setup_suse. Pre-create it so mysqld logs where
+    # the script actually looks.
+    mkdir -p /var/log/mysql && chown mysql:mysql /var/log/mysql 2>/dev/null || true
+    touch /var/log/mysql/mysqld.log && chown mysql:mysql /var/log/mysql/mysqld.log 2>/dev/null || true
     # The RPM %post scriptlet may leave /var/lib/mysql in a partial state when
     # systemd is unavailable (auto.cnf + binlog.index but no ibdata1).
     if [ ! -f /var/lib/mysql/ibdata1 ]; then
         rm -f /var/lib/mysql/auto.cnf /var/lib/mysql/binlog.index 2>/dev/null || true
-        mysqld --initialize --user=mysql >>/var/log/mysqld.log 2>&1
+        mysqld --initialize --user=mysql >>/var/log/mysql/mysqld.log 2>&1
     fi
     printf "INSTALL COMPONENT 'file://component_validate_password';\n" > /var/lib/mysql/docker-init.sql
-    nohup mysqld --user=mysql --init-file=/var/lib/mysql/docker-init.sql >>/var/log/mysqld.log 2>&1 &
+    nohup mysqld --user=mysql --init-file=/var/lib/mysql/docker-init.sql >>/var/log/mysql/mysqld.log 2>&1 &
     local i=0
     while [ $i -lt 60 ]; do
         mysqladmin ping --silent >/dev/null 2>&1 && return 0
