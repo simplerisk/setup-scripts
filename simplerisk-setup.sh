@@ -387,7 +387,11 @@ set_up_backup_cronjob() {
 	# root every minute. Running it as the web account instead means an
 	# overwritten cron.php only ever executes with the privileges the web
 	# account already has.
-	exec_cmd "echo '* * * * * ${1} $(which php) -f /var/www/simplerisk/cron/cron.php' > /etc/cron.d/simplerisk"
+	# Piped through tee rather than a literal `>` redirect: exec_cmd_nobail
+	# appends its own `> /dev/null 2>&1` to suppress non-debug output, and a
+	# second stdout redirect in the same command would win, truncating the
+	# file to empty instead of writing the cron entry.
+	exec_cmd "echo '* * * * * ${1} $(which php) -f /var/www/simplerisk/cron/cron.php' | tee /etc/cron.d/simplerisk"
 	run_cmd chmod 644 /etc/cron.d/simplerisk
 }
 
