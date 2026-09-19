@@ -134,7 +134,10 @@ validate_os_and_version(){
 	local valid
 	case "${OS}" in
 		"${UBUNTU_OSVAR}")
-			if [ "${VER}" = '22.04' ] || [[ "${VER}" = 24.* ]] || [[ "${VER}" = 25.* ]]; then
+			# LTS releases only - interim (non-LTS) releases like 25.04/25.10
+			# get ~9 months of upstream support and churn every 6 months, so
+			# they're intentionally not accepted here.
+			if [ "${VER}" = '22.04' ] || [[ "${VER}" = 24.* ]] || [[ "${VER}" = 26.* ]]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
@@ -1024,7 +1027,12 @@ uninstall_ubuntu_debian(){
 	run_cmd_nobail rm -rf /var/log/simplerisk
 
 	print_status 'Removing installed packages...'
-	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin"
+	# sensible-mda is a dependency of sendmail with its own hard Depends on
+	# the mail-transport-agent virtual package. Left out of this purge, apt
+	# has to keep that dependency satisfied by auto-installing a replacement
+	# MTA (courier-mta, pulling in ~40 packages including a full C build
+	# toolchain) instead of just removing sensible-mda alongside sendmail.
+	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin sensible-mda"
 	run_cmd_nobail apt-get autoremove -y
 	run_cmd_nobail apt-get autoclean
 
