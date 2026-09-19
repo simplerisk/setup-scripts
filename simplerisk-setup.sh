@@ -379,7 +379,20 @@ set_up_simplerisk() {
 }
 
 set_up_backup_cronjob() {
-	exec_cmd "(crontab -l 2>/dev/null; echo '* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php') | crontab -"
+	# $1 receives the web-server account (www-data / apache / wwwrun).
+	# Installed as a system cron.d entry with that account in the user column,
+	# rather than appended to root's crontab: cron/cron.php is owned and
+	# writable by the web account (see set_up_simplerisk's chown -R), so
+	# running it as root would let anyone who can write that file escalate to
+	# root every minute. Running it as the web account instead means an
+	# overwritten cron.php only ever executes with the privileges the web
+	# account already has.
+	# Piped through tee rather than a literal `>` redirect: exec_cmd_nobail
+	# appends its own `> /dev/null 2>&1` to suppress non-debug output, and a
+	# second stdout redirect in the same command would win, truncating the
+	# file to empty instead of writing the cron entry.
+	exec_cmd "echo '* * * * * ${1} $(which php) -f /var/www/simplerisk/cron/cron.php' | tee /etc/cron.d/simplerisk"
+	run_cmd chmod 644 /etc/cron.d/simplerisk
 }
 
 set_up_simplerisk_log() {
@@ -437,6 +450,9 @@ bail() {
 }
 
 remove_backup_cronjob() {
+	run_cmd_nobail rm -f /etc/cron.d/simplerisk
+	# Also strip any legacy root-crontab entry left by installs from before
+	# the cron job was moved to run as the web-server account.
 	(crontab -l 2>/dev/null | grep -v 'simplerisk/cron/cron.php') | crontab - 2>/dev/null || true
 }
 
@@ -598,7 +614,7 @@ setup_ubuntu_debian(){
 	run_cmd rm -r /var/www/simplerisk/database.sql
 
 	print_status 'Setting up Backup cronjob...'
-	set_up_backup_cronjob
+	set_up_backup_cronjob 'www-data'
 
 	print_status 'Installing UFW firewall...'
 	run_cmd apt-get install -y ufw
@@ -737,7 +753,7 @@ EOF
 	run_cmd systemctl enable --now crond
 
 	print_status 'Setting up Backup cronjob...'
-	set_up_backup_cronjob
+	set_up_backup_cronjob 'apache'
 
 	print_status 'Enabling and starting the Apache web server...'
 	run_cmd systemctl enable httpd
@@ -963,7 +979,7 @@ EOF
 	run_cmd systemctl enable --now cron
 
 	print_status 'Setting up Backup cronjob...'
-	set_up_backup_cronjob
+	set_up_backup_cronjob 'wwwrun'
 
 	print_status 'Installing and enabling firewall...'
 	run_cmd zypper -n install firewalld
