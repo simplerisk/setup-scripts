@@ -1,0 +1,44 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV container=docker
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        sudo \
+        curl \
+        wget \
+        lsb-release \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# MySQL uses native AIO by default, which fails on Docker's overlayfs storage
+# driver during the post-install data directory initialisation. Pre-creating
+# this config disables AIO so that `lamp-server^` installs cleanly.
+RUN mkdir -p /etc/mysql/conf.d && \
+    printf '[mysqld]\ninnodb_use_native_aio=0\n' > /etc/mysql/conf.d/docker.cnf
+
+# DENY all service operations during the lamp-server^ pre-install below.
+# This is the standard Docker pattern: MySQL's post-install script tries to
+# start mysqld for initialization and then shut it down — the shutdown step
+# times out inside Docker's overlayfs because the process can't be signalled
+# cleanly. By denying service actions here, dpkg skips start/stop but still
+# initialises the data directory via mysqld --initialize, which is sufficient.
+RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && \
+    chmod +x /usr/sbin/policy-rc.d
+
+# Pre-install lamp-server^ so that when the setup script calls
+# `apt-get install -y lamp-server^` during the test run, all packages are
+# already present and dpkg has nothing to reconfigure.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y lamp-server^ && \
+    rm -rf /var/lib/apt/lists/*
+
+# Switch back to ALLOW so the setup script can start/stop services normally
+# during the test (service mysql restart, service apache2 restart, etc.).
+RUN printf '#!/bin/sh\nexit 0\n' > /usr/sbin/policy-rc.d && \
+    chmod +x /usr/sbin/policy-rc.d
+
+# No systemd required — the script uses `service` on Ubuntu/Debian,
+# which invokes /etc/init.d wrappers and works in containers.
+CMD ["/bin/bash"]

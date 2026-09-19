@@ -1,0 +1,37 @@
+FROM quay.io/centos/centos:stream10
+
+ENV container=docker
+
+# --allowerasing lets DNF swap curl-minimal (pre-installed) for full curl.
+# cronie (crontab) and which are pre-installed on real RHEL/CentOS servers but
+# absent from the minimal container image; add them so the setup script can
+# install the backup cron job.
+RUN dnf -y install --allowerasing curl wget sudo cronie which && \
+    dnf clean all
+
+# MySQL uses native AIO by default, which fails on Docker's overlayfs driver.
+RUN mkdir -p /etc/my.cnf.d && \
+    printf '[mysqld]\ninnodb_use_native_aio=0\n' > /etc/my.cnf.d/docker.cnf
+
+# systemd cannot start in Docker Desktop for Windows (cgroup v2 unavailable).
+# This shim replaces /usr/bin/systemctl so the setup script's
+# `systemctl start/stop/restart/enable/disable/daemon-reload` calls work
+# by managing processes directly instead.
+# The script is kept in a separate file to avoid heredoc parsing issues across
+# different Docker builder versions.
+COPY systemctl-shim-centos.sh /usr/local/bin/systemctl
+RUN chmod +x /usr/local/bin/systemctl
+
+# firewall-cmd, setsebool, and chcon need no-op shims:
+#   - firewalld cannot run in Docker Desktop (no nftables/iptables backend)
+#   - SELinux is not enforced in Docker containers on Windows (WSL2)
+# Placing shims in /usr/local/bin/ ensures they take precedence over the real
+# binaries in /usr/sbin/ when the setup script's PATH is evaluated.
+RUN printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/firewall-cmd && \
+    chmod +x /usr/local/bin/firewall-cmd && \
+    printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/setsebool && \
+    chmod +x /usr/local/bin/setsebool && \
+    printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/chcon && \
+    chmod +x /usr/local/bin/chcon
+
+CMD ["/bin/bash"]
