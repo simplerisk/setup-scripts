@@ -967,6 +967,13 @@ EOF
 
 	print_status 'Restarting MySQL to load the new configuration...'
 	run_cmd systemctl restart mysql
+	# The SUSE mysql-community-server package's /etc/my.cnf has no
+	# `!includedir /etc/my.cnf.d` directive, so the drop-in above is never
+	# read - apply the same setting live as a safety net, matching the
+	# CentOS/RHEL path's handling of the same MySQL 8.4+ behavior.
+	exec_cmd "mysql -uroot -p\"${NEW_MYSQL_ROOT_PASSWORD}\" \
+		-e \"SET GLOBAL sql_mode='NO_ENGINE_SUBSTITUTION';\" \
+		2>/dev/null"
 
 	print_status 'Removing the SimpleRisk database file...'
 	run_cmd rm -r /var/www/simplerisk/database.sql
@@ -1121,7 +1128,11 @@ uninstall_suse(){
 
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
-	run_cmd_nobail zypper -n autoremove
+	# zypper has no built-in orphan-dependency cleanup equivalent to
+	# `apt-get autoremove`/`dnf autoremove` (a prior `zypper -n autoremove`
+	# call here always failed with "Unknown command", aborting the rest of
+	# uninstall_suse under set -e before the MySQL repo, firewall rules, and
+	# password file below were ever removed).
 
 	print_status 'Removing MySQL repository and drop-in config...'
 	exec_cmd_nobail 'rpm -e mysql84-community-release-sl15 2>/dev/null || true'
