@@ -133,9 +133,21 @@ elif command -v httpd > /dev/null 2>&1; then
 fi
 
 # ── HTTP reachability ────────────────────────────────────────────────────────
+# A bare 200/301/302 only proves *something* answered on port 80 - it would
+# also pass for a PHP fatal-error page, a blank page, or Apache's own default
+# page. Follow the http->https redirect and grep the actual response body.
+#
+# A brand-new database has zero rows in `user`, so index.php's own gate
+# (`if ($count == 0) { create_default_admin_account(); exit(); }`) shows the
+# "Default Admin Account Creation" wizard and returns *before* the login form
+# ever renders - that page, not the login screen, is the correct thing to see
+# after a fresh install. verify_create_default_admin_account is that page's
+# submit button name, a literal HTML attribute (not a translatable string).
 echo "--- HTTP ---"
-check "HTTP on port 80 returns a redirect or 200" \
-    bash -c "curl -sk -o /dev/null -w '%{http_code}' http://localhost/ | grep -qE '^(200|301|302)$'"
+check "HTTP request reaches the app (following any http->https redirect)" \
+    bash -c "test \"\$(curl -sk -o /dev/null -w '%{http_code}' -L http://localhost/)\" = 200"
+check "SimpleRisk's default-admin-account page is actually rendered (not an error/default page)" \
+    bash -c "curl -sk -L http://localhost/ | grep -q 'name=\"verify_create_default_admin_account\"'"
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
