@@ -8,7 +8,7 @@ readonly CENTOS_STREAM_OSVAR='CentOS Stream'
 readonly RHEL_OSVAR='Red Hat Enterprise Linux'
 readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
-readonly SLES_15_SUPPORTED_SP="15"
+readonly OPENSUSE_LEAP_OSVAR='openSUSE Leap'
 
 readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2025'
 readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html
@@ -132,6 +132,7 @@ load_os_variables(){
 
 validate_os_and_version(){
 	local valid
+	local untested_note
 	case "${OS}" in
 		"${UBUNTU_OSVAR}")
 			# LTS releases only - interim (non-LTS) releases like 25.04/25.10
@@ -155,30 +156,50 @@ validate_os_and_version(){
 			if [[ "${VER}" = 9* ]] || [[ "${VER}" = 10* ]]; then
 				valid=y
 				SETUP_TYPE=rhel
+				# RHEL shares the exact same install code path as CentOS
+				# Stream (which CI does cover), but RHEL itself has never
+				# actually been run in CI: Red Hat's official container
+				# images require a paid subscription, and the free UBI
+				# images can't substitute (see README). Let the user know
+				# this specific OS is unverified, not just "supported".
+				untested_note="RHEL is not independently tested in CI (it shares its install code with CentOS Stream, which is tested) - see the README for why."
 			fi;;
 		"${SLES_OSVAR}")
-			# SLES 15 (all service packs) is not supported: SimpleRisk's
-			# current release requires PHP >= 8.3 (Composer platform check),
-			# and SLES 15's own repositories cap out at PHP 8.2 (the php8
-			# package) with no upgrade path. openSUSE's community
-			# devel:languages:php OBS project, which sometimes backports a
-			# newer PHP to older releases, has dropped 15.6 support entirely
-			# and only targets the next major release (16.0), which is not
-			# yet generally available for SLES. openSUSE Leap 16.0 already
-			# ships PHP 8.4 natively, so SLES 16 (once released) should be a
-			# viable target - but setup_suse()/uninstall_suse() below are
-			# written entirely around SLES 15's package names, module
-			# structure, and MySQL repo RPM naming
-			# (mysql84-community-release-sl15), so adding SLES 16 support
-			# needs its own dedicated pass, not just changing this version
-			# check.
-			print_error_message "SLES/openSUSE is not currently supported: SimpleRisk requires PHP >= 8.3, and SLES 15's repositories only offer PHP 8.2 with no upgrade path currently available.";;
+			# SLES 15 (all service packs, including SP7's PHP 8.3) is not
+			# supported here: even though SP7's release notes list PHP 8.3.x,
+			# there's no way to verify that install path - openSUSE Leap
+			# 15.x (which would normally serve as SLES 15's free/testable
+			# proxy) ended at 15.6, which is now EOL and still capped at PHP
+			# 8.2, and real SLES 15 containers require a paid SCC
+			# subscription. See the README's SLES caveat for the same
+			# reasoning in more detail.
+			#
+			# SLES 16.0 (see below) ships PHP 8.4 and is supported and
+			# CI-tested directly.
+			if [[ "${VER}" = 16.* ]]; then
+				valid=y
+				SETUP_TYPE=suse
+			fi;;
+		"${OPENSUSE_LEAP_OSVAR}")
+			# Leap 16.0 ships PHP 8.4 (php8 package) and a real MySQL
+			# Community Server RPM (built for SLES 15) installs and runs on
+			# it cleanly - see setup_suse()/uninstall_suse() below. Point
+			# releases within 16.x are expected to stay compatible, mirroring
+			# how Ubuntu's 24.*/26.* are accepted above. Older Leap releases
+			# (15.x and earlier) cap out at PHP 8.2, same as SLES 15.
+			if [[ "${VER}" = 16.* ]]; then
+				valid=y
+				SETUP_TYPE=suse
+			fi;;
 		*)
 			local unknown=y;;
 	esac
 
 	if [ -n "${valid:-}" ]; then
 		echo "Detected OS is ${OS} ${VER}, which is supported by this script."
+		if [ -n "${untested_note:-}" ]; then
+			echo "NOTE: ${untested_note}"
+		fi
 	elif [ -z "${valid:-}" ] && [ ! -v unknown ]; then
 		echo "Detected OS is ${OS} ${VER}, but this version is not currently supported by this script."
 		exit 1
@@ -857,21 +878,18 @@ setup_suse(){
 	# "The Tokenizer extension is required for the routing attribute loader"),
 	# php8-ctype, php8-xmlreader, php8-xmlwriter. Note 'php-xml' does not exist
 	# on SUSE, and SimpleRisk's healthcheck only flags dom, so the others were
-	# silently missing.
-	run_cmd zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php8-dom php8-openssl php8-tokenizer php8-ctype php8-xmlreader php8-xmlwriter
+	# silently missing. php8-cli is also separate here (unlike Debian/RHEL,
+	# where the base PHP package includes the CLI binary) and is needed for
+	# the backup cron job, which invokes `php` directly.
+	run_cmd zypper -n install php8 php8-cli php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php8-dom php8-openssl php8-tokenizer php8-ctype php8-xmlreader php8-xmlwriter
 
-	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
-		print_status 'Enabling PHP and Apache modules...'
-		for module in php8 rewrite ssl mod_ssl; do
-			run_cmd a2enmod "$module"
-		done
-	fi
-
-	print_status 'Enabling Rewrite Module for Apache...'
-	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
-		grep -qF 'mod_rewrite.so' /etc/apache2/loadmodule.conf 2>/dev/null || \
-			echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
-	fi
+	print_status 'Enabling PHP and Apache modules...'
+	# a2enmod is idempotent and self-appends the needed LoadModule line, so
+	# this runs unconditionally rather than only on modules that aren't
+	# already enabled by default (e.g. php8/ssl on Leap 16.0).
+	for module in php8 rewrite ssl mod_ssl; do
+		run_cmd a2enmod "$module"
+	done
 
 	print_status 'Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert'
 	grep -qxF 'Listen 443' /etc/apache2/vhosts.d/simplerisk.conf 2>/dev/null || echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf

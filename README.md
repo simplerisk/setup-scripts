@@ -13,10 +13,37 @@
     *is* covered by CI below, but RHEL itself isn't independently tested: Red Hat's official container images require a
     paid subscription, and the free UBI images can't substitute because `firewalld` and `sendmail`, both of which the
     script installs, aren't published to any repo UBI can reach without one.
+- openSUSE Leap 16.0
+  - Leap 16.0 ships PHP 8.4 natively; a real MySQL Community Server RPM (built for SLES 15) installs and runs on it
+    without issue - see `setup_suse`/`uninstall_suse` in `simplerisk-setup.sh`.
+- SUSE Linux Enterprise Server (SLES) 16.0
+  - SLES 16.0 and openSUSE Leap 16.0 share the exact same package builds (`setup_suse`/`uninstall_suse` is one code path
+    for both), and unlike RHEL, SLES 16 *is* independently tested: SUSE's free, unauthenticated BCI (Base Container
+    Image) - `registry.suse.com/bci/bci-base:16.0` - carries its own public `SLE_BCI` repo with no SCC subscription
+    needed, so CI runs the real installer against real SLES 16, not just its openSUSE proxy.
 
-SUSE Linux Enterprise Server (SLES) is not currently supported: SimpleRisk requires PHP >= 8.3, and SLES 15's own
-repositories only offer PHP 8.2 with no upgrade path currently available. Support may return once a SLES release with a
-newer PHP is available.
+## Explicitly unsupported versions
+
+A few versions are excluded on purpose, not simply because they haven't been tried yet:
+
+- **openSUSE Tumbleweed** - a rolling release, not a stable/LTS-equivalent target. Even though it always carries a
+  current PHP, this script intentionally only targets openSUSE's stable branch (Leap).
+- **openSUSE Leap 15.x and earlier** - capped at PHP 8.2 (the same `php8` package SLES 15 ships) with no upgrade path,
+  and Leap 15.6, the last 15.x release, is now end-of-life.
+- **SUSE Linux Enterprise Server (SLES) 15** (all service packs) - not supported, and won't be added without a way to
+  verify it. SLES 15 SP7's release notes list PHP 8.3.x as available, which would clear SimpleRisk's PHP >= 8.3
+  requirement, but that can't currently be confirmed: openSUSE Leap 15.x, which would otherwise serve as SLES 15's
+  free/testable proxy the way Leap 16.0 does for SLES 16.0, ended at 15.6 (see above) and never exceeded PHP 8.2, and
+  real SLES 15 container images require a paid SCC subscription to test directly.
+- **Ubuntu releases older than 22.04** (18.04, 20.04, etc.), and interim (non-LTS) releases - see the LTS-only policy
+  above.
+- **Debian releases older than 13** (11, 12, etc.) - out of scope; only the version listed above is targeted.
+- **CentOS Stream / RHEL releases older than 9** (8, 7, etc.) - out of scope; CentOS 8 reached end-of-life in December
+  2021, and older major versions aren't targeted regardless of a given release's own support status.
+- **RHEL-compatible rebuilds** (Rocky Linux, AlmaLinux, Oracle Linux, etc.) - not tested, even though they're binary-
+  compatible with RHEL: `/etc/os-release`'s `NAME` differs from `Red Hat Enterprise Linux`/`Red Hat Enterprise Linux
+  Server`, so `validate_os_and_version()` doesn't recognize them and the script exits rather than assuming
+  compatibility.
 
 ## Instructions
 

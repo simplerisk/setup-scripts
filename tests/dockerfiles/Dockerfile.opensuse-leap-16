@@ -1,0 +1,33 @@
+FROM opensuse/leap:16.0
+
+ENV container=docker
+
+# wget and which are pre-installed on a real openSUSE Leap server but absent
+# from the minimal container image; simplerisk-setup.sh relies on both
+# (wget to fetch the SimpleRisk bundle/database, which to locate the php
+# binary for the backup cron entry) without installing them itself, since a
+# real server is assumed to already have them.
+RUN zypper --non-interactive install wget which && \
+    zypper clean --all
+
+# MySQL uses native AIO by default, which fails on Docker's overlayfs driver.
+RUN mkdir -p /etc/my.cnf.d && \
+    printf '[mysqld]\ninnodb_use_native_aio=0\n' > /etc/my.cnf.d/docker.cnf
+
+# systemd cannot start in Docker Desktop for Windows (cgroup v2 unavailable).
+# This shim replaces /usr/bin/systemctl so the setup script's
+# `systemctl start/stop/restart/enable/disable` calls work by managing
+# processes directly instead.
+# The script is kept in a separate file to avoid heredoc parsing issues across
+# different Docker builder versions.
+COPY systemctl-shim-suse.sh /usr/local/bin/systemctl
+RUN chmod +x /usr/local/bin/systemctl
+
+# firewall-cmd needs a no-op shim: firewalld cannot run in Docker Desktop (no
+# nftables/iptables backend). Placing it in /usr/local/bin/ ensures it takes
+# precedence over the real binary in /usr/sbin/ when the setup script's PATH
+# is evaluated.
+RUN printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/firewall-cmd && \
+    chmod +x /usr/local/bin/firewall-cmd
+
+CMD ["/bin/bash"]
