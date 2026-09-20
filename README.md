@@ -9,6 +9,10 @@
 - Debian 13
 - CentOS Stream 9, 10
 - Red Hat Enterprise Linux (RHEL) 9, 10
+  - RHEL shares the exact same install code path as CentOS Stream (see `setup_centos_rhel` in `simplerisk-setup.sh`), which
+    *is* covered by CI below, but RHEL itself isn't independently tested: Red Hat's official container images require a
+    paid subscription, and the free UBI images can't substitute because `firewalld` and `sendmail`, both of which the
+    script installs, aren't published to any repo UBI can reach without one.
 
 SUSE Linux Enterprise Server (SLES) is not currently supported: SimpleRisk requires PHP >= 8.3, and SLES 15's own
 repositories only offer PHP 8.2 with no upgrade path currently available. Support may return once a SLES release with a
