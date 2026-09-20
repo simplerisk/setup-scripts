@@ -202,16 +202,21 @@ check "Logged in as the newly-created admin account" \
 # generated), so merely checking for a non-empty value would pass instantly
 # without ever seeing a real tick - require a value newer than when this
 # poll started instead. Right after a fresh install there may not have been
-# a full minute yet for the first real tick, so poll for up to 75s,
-# comfortably past one minute-boundary, rather than race it.
+# a full minute yet for the first real tick, so poll comfortably past two
+# minute-boundaries (150s) rather than race a single one - shared CI runners
+# can have enough scheduling jitter that a 75s/one-boundary margin isn't
+# reliable.
 CRON_POLL_START=$(date +%s)
 CRON_LAST_RUN=0
-for _ in $(seq 1 75); do
+for _ in $(seq 1 150); do
     CRON_LAST_RUN=$(mysql -uroot --password="${MYSQL_ROOT_PW:-}" simplerisk -N -e \
         "SELECT value FROM settings WHERE name = 'cron_last_run';" 2>/dev/null)
     [ -n "${CRON_LAST_RUN:-}" ] && [ "${CRON_LAST_RUN}" -ge "${CRON_POLL_START}" ] 2>/dev/null && break
     sleep 1
 done
+if [ -z "${CRON_LAST_RUN:-}" ] || [ "${CRON_LAST_RUN:-0}" -lt "${CRON_POLL_START}" ] 2>/dev/null; then
+    echo "  (cron diagnostics: $(pgrep -af 'cron|crond' 2>/dev/null | grep -v "$$" || echo 'no cron/crond process found'))"
+fi
 check "SimpleRisk's own automation cron has ticked at least once since this check started" \
     bash -c "[ -n '${CRON_LAST_RUN:-}' ] && [ '${CRON_LAST_RUN:-0}' -ge '${CRON_POLL_START}' ]"
 
