@@ -210,26 +210,44 @@ check "Logged in as the newly-created admin account" \
 # at all (confirmed via simplerisk.log showing zero cron invocations across
 # multiple minute-boundaries, despite crond running and the file being
 # correctly formatted) even though the exact same flow passes locally in
-# Docker Desktop. Force a re-scan explicitly with SIGHUP rather than trust
-# inotify, since a missed live-reload is a test-environment concern, not
-# something to weaken the health check itself over.
-pkill -HUP crond 2>/dev/null || pkill -HUP cron 2>/dev/null || true
-
+# Docker Desktop. A SIGHUP nudge to force a re-scan didn't help either, so
+# the daemon itself may be trying and silently failing (its own diagnostics
+# normally go to syslog, which may not even be running in this minimal
+# container) rather than simply never noticing the file.
 CRON_POLL_START=$(date +%s)
 CRON_LAST_RUN=0
-for _ in $(seq 1 150); do
+for _ in $(seq 1 60); do
     CRON_LAST_RUN=$(mysql -uroot --password="${MYSQL_ROOT_PW:-}" simplerisk -N -e \
         "SELECT value FROM settings WHERE name = 'cron_last_run';" 2>/dev/null)
     [ -n "${CRON_LAST_RUN:-}" ] && [ "${CRON_LAST_RUN}" -ge "${CRON_POLL_START}" ] 2>/dev/null && break
     sleep 1
 done
+
+if [ -z "${CRON_LAST_RUN:-}" ] || [ "${CRON_LAST_RUN:-0}" -lt "${CRON_POLL_START}" ] 2>/dev/null; then
+    # One minute-boundary passed with nothing: replace the daemon with a
+    # foreground, verbosely-logged instance so its own parsing/exec
+    # diagnostics land in a file instead of a syslog sink that may not
+    # exist, then give it one more full minute-boundary before giving up.
+    (pkill -x crond || pkill -x cron) 2>/dev/null || true
+    sleep 1
+    ( (crond -n -x sch,proc,pars || cron -f) > /tmp/crond-debug.log 2>&1 & )
+    for _ in $(seq 1 65); do
+        CRON_LAST_RUN=$(mysql -uroot --password="${MYSQL_ROOT_PW:-}" simplerisk -N -e \
+            "SELECT value FROM settings WHERE name = 'cron_last_run';" 2>/dev/null)
+        [ -n "${CRON_LAST_RUN:-}" ] && [ "${CRON_LAST_RUN}" -ge "${CRON_POLL_START}" ] 2>/dev/null && break
+        sleep 1
+    done
+fi
+
 if [ -z "${CRON_LAST_RUN:-}" ] || [ "${CRON_LAST_RUN:-0}" -lt "${CRON_POLL_START}" ] 2>/dev/null; then
     echo "  --- cron diagnostics (tick not observed within the poll window) ---"
-    echo "  daemon: $(pgrep -x crond 2>/dev/null || pgrep -x cron 2>/dev/null || echo 'no cron/crond process found')"
+    echo "  daemon: $(pgrep -af 'crond|cron ' 2>/dev/null || echo 'no cron/crond process found')"
     echo "  cron.d entry: $(ls -l /etc/cron.d/simplerisk 2>&1)"
     echo "  $(cat /etc/cron.d/simplerisk 2>&1)"
     echo "  simplerisk.log, last 20 cron-related lines (any timeframe):"
     grep -i cron /var/log/simplerisk/simplerisk.log 2>/dev/null | tail -20
+    echo "  crond debug output (foreground, verbose restart), last 60 lines:"
+    tail -60 /tmp/crond-debug.log 2>/dev/null
     echo "  --- end cron diagnostics ---"
 fi
 check "SimpleRisk's own automation cron has ticked at least once since this check started" \
