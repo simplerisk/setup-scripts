@@ -28,6 +28,8 @@ jobs:
           - debian-13
           - centos-stream-9
           - centos-stream-10
+          - opensuse-leap-16
+          - sles-16
 
     steps:
       - name: Checkout repository
@@ -129,10 +131,12 @@ jobs:
             docker exec "$CONTAINER" journalctl -n 50 2>/dev/null || true
           echo "=== Apache error log ===" && \
             docker exec "$CONTAINER" cat /var/log/apache2/error.log 2>/dev/null || \
-            docker exec "$CONTAINER" cat /var/log/httpd/error_log 2>/dev/null || true
+            docker exec "$CONTAINER" cat /var/log/httpd/error_log 2>/dev/null || \
+            docker exec "$CONTAINER" cat /var/log/apache2/error_log 2>/dev/null || true
           echo "=== MySQL error log (last 30 lines) ===" && \
             docker exec "$CONTAINER" tail -30 /var/log/mysql/error.log 2>/dev/null || \
-            docker exec "$CONTAINER" tail -30 /var/log/mysqld.log 2>/dev/null || true
+            docker exec "$CONTAINER" tail -30 /var/log/mysqld.log 2>/dev/null || \
+            docker exec "$CONTAINER" tail -30 /var/log/mysql/mysqld.log 2>/dev/null || true
           echo "=== /root/passwords.txt ===" && \
             docker exec "$CONTAINER" cat /root/passwords.txt 2>/dev/null || true
 

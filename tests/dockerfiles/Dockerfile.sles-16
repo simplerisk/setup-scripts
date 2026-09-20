@@ -1,0 +1,35 @@
+FROM registry.suse.com/bci/bci-base:16.0
+
+ENV container=docker
+
+# SUSE's BCI (Base Container Image) ships with its own free, unauthenticated
+# `SLE_BCI` repo baked in - no SCC subscription/registration needed, unlike
+# SLES 15-era images. It carries the exact same package builds as openSUSE
+# Leap 16.0 (identical `160000.x.x` release strings for php8/apache2/etc.),
+# just from a more minimal base: gawk, wget, and which aren't preinstalled
+# here the way they are on Leap 16.0's base image, but would be on a real
+# (non-container) SLES 16 server, so they're added here to match. gawk in
+# particular is required by simplerisk-setup.sh's own use of `awk`.
+RUN zypper --non-interactive install wget which gawk && \
+    zypper clean --all
+
+# MySQL uses native AIO by default, which fails on Docker's overlayfs driver.
+RUN mkdir -p /etc/my.cnf.d && \
+    printf '[mysqld]\ninnodb_use_native_aio=0\n' > /etc/my.cnf.d/docker.cnf
+
+# systemd cannot start in Docker Desktop for Windows (cgroup v2 unavailable).
+# This shim replaces /usr/bin/systemctl so the setup script's
+# `systemctl start/stop/restart/enable/disable` calls work by managing
+# processes directly instead. Shared with the openSUSE Leap 16.0 image since
+# setup_suse()/uninstall_suse() is the same code path for both.
+COPY systemctl-shim-suse.sh /usr/local/bin/systemctl
+RUN chmod +x /usr/local/bin/systemctl
+
+# firewall-cmd needs a no-op shim: firewalld cannot run in Docker Desktop (no
+# nftables/iptables backend). Placing it in /usr/local/bin/ ensures it takes
+# precedence over the real binary in /usr/sbin/ when the setup script's PATH
+# is evaluated.
+RUN printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/firewall-cmd && \
+    chmod +x /usr/local/bin/firewall-cmd
+
+CMD ["/bin/bash"]

@@ -112,7 +112,7 @@ check "PHP CLI is functional"                        php -r "echo 'OK';"
 check "PHP version is 8.x"                           bash -c "php --version | grep -qE '^PHP 8\.'"
 
 for ext in mysqli mbstring xml curl gd zip intl ldap; do
-    check "PHP extension '$ext' is loaded"           php -m | grep -qi "$ext"
+    check "PHP extension '$ext' is loaded"           bash -c "php -m | grep -qi '$ext'"
 done
 
 # ── Web server (OS-conditional) ───────────────────────────────────────────────
