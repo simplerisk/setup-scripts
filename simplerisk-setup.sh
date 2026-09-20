@@ -541,6 +541,13 @@ setup_ubuntu_debian(){
 		run_cmd apt-get install -y cron
 	fi
 
+	# Unlike apache2/mysql-server, the cron package's postinst does not
+	# reliably start the daemon in every environment (e.g. containers with
+	# policy-rc.d denying service auto-start by default). Every other OS
+	# branch explicitly enables/starts its cron daemon; do the same here.
+	print_status 'Ensuring cron is running...'
+	exec_cmd 'service cron status > /dev/null 2>&1 || service cron start'
+
 	print_status 'Installing PHP development libraries...'
 	run_cmd apt-get install -y "php${apt_php_version:-}-dev"
 
