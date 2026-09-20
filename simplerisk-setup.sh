@@ -490,8 +490,10 @@ setup_ubuntu_debian(){
 	print_status 'Populating apt-get cache...'
 	run_cmd apt-get update
 
-	# Add PHP8/MySQL repos for Debian
-	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+	# Add the Sury PHP8 repo. Debian also gets MySQL's own repo here (Ubuntu
+	# keeps whatever MySQL/MariaDB lamp-server^ bundles - see below - since
+	# only the PHP version, not MySQL provisioning, is the problem there).
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ] || [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		run_cmd mkdir -p /etc/apt/keyrings
 		local apt_php_version=8.5
 
@@ -512,10 +514,12 @@ setup_ubuntu_debian(){
 		fi
 		exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
 
-		print_status 'Adding MySQL 8 repository'
-		# Download the signing key directly from MySQL (more reliable than keyservers).
-		exec_cmd "curl -fsSL '$MYSQL_KEY_URL' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mysql.gpg"
-		exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
+		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+			print_status 'Adding MySQL 8 repository'
+			# Download the signing key directly from MySQL (more reliable than keyservers).
+			exec_cmd "curl -fsSL '$MYSQL_KEY_URL' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mysql.gpg"
+			exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
+		fi
 
 		print_status 'Re-populating apt-get cache with added repos...'
 		run_cmd apt-get update
@@ -529,6 +533,22 @@ setup_ubuntu_debian(){
 		run_cmd apt-get install -y 'lamp-server^'
 		print_status 'Installing cron...'
 		run_cmd apt-get install -y cron
+
+		# lamp-server^ installs whatever PHP version Ubuntu's own archive
+		# defaults to for this release (e.g. 8.1 on 22.04), which can be
+		# older than SimpleRisk's Composer platform requirement. Install the
+		# pinned Sury version from the repo added above and switch Apache's
+		# active PHP module to it, without touching the MySQL/Apache
+		# packages lamp-server^ already installed.
+		print_status "Installing PHP ${apt_php_version} from Ondrej's repository..."
+		run_cmd apt-get install -y "php${apt_php_version}" "php${apt_php_version}-mysql" "libapache2-mod-php${apt_php_version}"
+		for old_mod_file in /etc/apache2/mods-enabled/php*.load; do
+			[ -e "${old_mod_file}" ] || continue
+			old_mod=$(basename "${old_mod_file}" .load)
+			[ "${old_mod}" = "php${apt_php_version}" ] && continue
+			run_cmd a2dismod "${old_mod}"
+		done
+		run_cmd a2enmod "php${apt_php_version}"
 	else
 		print_status 'Installing Apache...'
 		run_cmd apt-get install -y apache2
@@ -1036,12 +1056,16 @@ uninstall_ubuntu_debian(){
 	run_cmd_nobail apt-get autoremove -y
 	run_cmd_nobail apt-get autoclean
 
-	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ] || [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		print_status 'Removing added repositories and keys...'
+		# Both OSes add the Sury PHP repo; only Debian adds MySQL's own repo
+		# (Ubuntu keeps whatever MySQL/MariaDB lamp-server^ installed).
 		run_cmd_nobail rm -f /etc/apt/sources.list.d/sury-php.list
-		run_cmd_nobail rm -f /etc/apt/sources.list.d/mysql.list
 		run_cmd_nobail rm -f /etc/apt/keyrings/sury-php.gpg
-		run_cmd_nobail rm -f /etc/apt/trusted.gpg.d/mysql.gpg
+		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+			run_cmd_nobail rm -f /etc/apt/sources.list.d/mysql.list
+			run_cmd_nobail rm -f /etc/apt/trusted.gpg.d/mysql.gpg
+		fi
 		run_cmd_nobail apt-get update
 	fi
 
