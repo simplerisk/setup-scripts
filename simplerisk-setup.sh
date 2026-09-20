@@ -210,13 +210,13 @@ validate_os_and_version(){
 }
 
 perform_installation() {
-	local current_simplerisk_version
-	current_simplerisk_version=$(get_current_simplerisk_version)
+	# Sets SIMPLERISK_VERSION, SIMPLERISK_BUNDLE_SHA256, SIMPLERISK_DB_SHA256.
+	get_current_simplerisk_version
 
 	case "${SETUP_TYPE:-}" in
-		debian) setup_ubuntu_debian "$current_simplerisk_version";;
-		rhel) setup_centos_rhel "$current_simplerisk_version";;
-		suse) setup_suse "$current_simplerisk_version";;
+		debian) setup_ubuntu_debian "$SIMPLERISK_VERSION";;
+		rhel) setup_centos_rhel "$SIMPLERISK_VERSION";;
+		suse) setup_suse "$SIMPLERISK_VERSION";;
 		*) print_error_message "Could not validate the setup type. Check the perform_installation and validate_os_and_version functions.";;
 	esac
 
@@ -379,10 +379,17 @@ set_up_simplerisk() {
 	elif [ -d /var/www/html ]; then
 		run_cmd rm -r /var/www/html
 	fi
-	exec_cmd "cd /var/www && wget https://simplerisk-downloads.s3.amazonaws.com/public/bundles/simplerisk-${2}.tgz"
-	exec_cmd "cd /var/www && tar xvzf simplerisk-${2}.tgz"
+	# run_cmd (array-safe, no shell re-evaluation) rather than exec_cmd/bash -c:
+	# ${2} is the version from get_current_simplerisk_version(), which is
+	# validated but this avoids ever interpolating it into a shell string
+	# regardless (see HackerOne #3764025). wget's own -P/-O flags replace the
+	# previous `cd DIR && wget ...` pattern.
+	run_cmd wget -P /var/www "https://simplerisk-downloads.s3.amazonaws.com/public/bundles/simplerisk-${2}.tgz"
+	verify_sha256 "/var/www/simplerisk-${2}.tgz" "$SIMPLERISK_BUNDLE_SHA256"
+	run_cmd tar -xvzf "/var/www/simplerisk-${2}.tgz" -C /var/www
 	run_cmd rm -f "/var/www/simplerisk-${2}.tgz"
-	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql -O database.sql"
+	run_cmd wget -O /var/www/simplerisk/database.sql "https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql"
+	verify_sha256 /var/www/simplerisk/database.sql "$SIMPLERISK_DB_SHA256"
 	run_cmd cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php
 	run_cmd chown -R "${1}:" /var/www/simplerisk
 	# Log directory/file creation, ownership, and permissions are handled by
@@ -417,7 +424,46 @@ set_up_simplerisk_log() {
 }
 
 get_current_simplerisk_version() {
-	curl -sL "https://updates.simplerisk.com/releases.xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2
+	# Sets (intentionally not `local`, read by set_up_simplerisk() later):
+	#   SIMPLERISK_VERSION        - the release identifier, e.g. "20260909-001"
+	#   SIMPLERISK_BUNDLE_SHA256  - expected sha256 of the .tgz bundle
+	#   SIMPLERISK_DB_SHA256      - expected sha256 of the English database.sql
+	local releases_xml
+	releases_xml=$(curl -sL "https://updates.simplerisk.com/releases.xml")
+
+	SIMPLERISK_VERSION=$(printf '%s' "$releases_xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2)
+
+	# releases.xml versions are always "YYYYMMDD-NNN" (an 8-digit release date,
+	# a dash, a 1-4 digit release number). Reject anything else outright: this
+	# value is used to build the wget URLs below, and previously flowed
+	# unvalidated into a bash -c string - a compromised feed could inject
+	# shell metacharacters there and get root code execution during install
+	# (HackerOne #3764025).
+	if [[ ! "$SIMPLERISK_VERSION" =~ ^[0-9]{8}-[0-9]{1,4}$ ]]; then
+		print_error_message "Update feed returned an unexpected version string ('${SIMPLERISK_VERSION}'). Aborting rather than trust an unvalidated value."
+	fi
+
+	# Also capture the checksums releases.xml publishes for this same release,
+	# so set_up_simplerisk() can verify the downloaded bundle/database against
+	# them - defense in depth against the artifact hosts (S3, GitHub raw)
+	# being compromised independently of releases.xml itself, or a MITM on
+	# just the download step.
+	SIMPLERISK_BUNDLE_SHA256=$(printf '%s' "$releases_xml" | grep -oP '<bundle_sha256>\K[^<]+' | head -n1)
+	SIMPLERISK_DB_SHA256=$(printf '%s' "$releases_xml" | sed -n '/<en>/,/<\/en>/p' | grep -oP '<sha256>\K[^<]+' | head -n1)
+}
+
+# Aborts the install if a downloaded file's sha256 doesn't match what
+# releases.xml published for it. $1 = path to the downloaded file;
+# $2 = expected sha256 (from SIMPLERISK_BUNDLE_SHA256/SIMPLERISK_DB_SHA256).
+verify_sha256() {
+	local file="$1" expected="$2" actual
+	if [ -z "$expected" ]; then
+		print_error_message "No checksum was published in releases.xml for ${file}; refusing to trust an unverifiable download."
+	fi
+	actual=$(sha256sum "$file" | cut -d ' ' -f 1)
+	if [ "$actual" != "$expected" ]; then
+		print_error_message "Checksum mismatch for ${file}: expected ${expected}, got ${actual}. The downloaded file does not match releases.xml; aborting."
+	fi
 }
 
 get_installed_php_version() {
