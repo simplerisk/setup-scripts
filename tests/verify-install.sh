@@ -201,11 +201,20 @@ check "Logged in as the newly-created admin account" \
 # cron_last_run value baked in (a fixture from whenever the .sql dump was
 # generated), so merely checking for a non-empty value would pass instantly
 # without ever seeing a real tick - require a value newer than when this
-# poll started instead. Right after a fresh install there may not have been
-# a full minute yet for the first real tick, so poll comfortably past two
-# minute-boundaries (150s) rather than race a single one - shared CI runners
-# can have enough scheduling jitter that a 75s/one-boundary margin isn't
-# reliable.
+# poll started instead.
+#
+# crond starts (systemctl enable --now crond) *before* set_up_backup_cronjob
+# ever writes /etc/cron.d/simplerisk, so picking up that new file relies on
+# crond's inotify watch on /etc/cron.d - which real production servers do
+# reliably, but on GitHub Actions' runners this was observed to never fire
+# at all (confirmed via simplerisk.log showing zero cron invocations across
+# multiple minute-boundaries, despite crond running and the file being
+# correctly formatted) even though the exact same flow passes locally in
+# Docker Desktop. Force a re-scan explicitly with SIGHUP rather than trust
+# inotify, since a missed live-reload is a test-environment concern, not
+# something to weaken the health check itself over.
+pkill -HUP crond 2>/dev/null || pkill -HUP cron 2>/dev/null || true
+
 CRON_POLL_START=$(date +%s)
 CRON_LAST_RUN=0
 for _ in $(seq 1 150); do
