@@ -515,43 +515,30 @@ setup_ubuntu_debian(){
 	print_status 'Updating current packages (this may take a bit)...'
 	run_cmd apt-get dist-upgrade -qq --assume-yes
 
+	# Both OSes install the same explicit package set - Ubuntu previously
+	# used the lamp-server^ "task" metapackage instead, but that pulls in a
+	# large set of packages beyond the actual LAMP stack (CGI/Perl libraries,
+	# etc.) that SimpleRisk has no use for, and still needed the Sury PHP
+	# package installed and its Apache module swapped in afterward to
+	# override whatever older PHP lamp-server^ had already defaulted to.
+	# Installing the same explicit packages Debian already uses (now that
+	# Ubuntu gets the same Sury repo added above) gets the pinned PHP
+	# version directly, with nothing to swap out.
+	print_status 'Installing Apache...'
+	run_cmd apt-get install -y apache2
+
+	print_status 'Installing MySQL...'
+	run_cmd apt-get install -y mysql-server
+
+	print_status 'Installing PHP...'
+	run_cmd apt-get install -y "php${apt_php_version:-}" "php${apt_php_version:-}-mysql" "libapache2-mod-php${apt_php_version:-}"
+
 	if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
-		print_status 'Installing lamp-server...'
-		run_cmd apt-get install -y 'lamp-server^'
 		print_status 'Installing cron...'
 		run_cmd apt-get install -y cron
-
-		# lamp-server^ installs whatever PHP version Ubuntu's own archive
-		# defaults to for this release (e.g. 8.1 on 22.04), which can be
-		# older than SimpleRisk's Composer platform requirement. Install the
-		# pinned Sury version from the repo added above and switch Apache's
-		# active PHP module to it, without touching the MySQL/Apache
-		# packages lamp-server^ already installed.
-		print_status "Installing PHP ${apt_php_version} from Ondrej's repository..."
-		run_cmd apt-get install -y "php${apt_php_version}" "php${apt_php_version}-mysql" "libapache2-mod-php${apt_php_version}"
-		for old_mod_file in /etc/apache2/mods-enabled/php*.load; do
-			[ -e "${old_mod_file}" ] || continue
-			old_mod=$(basename "${old_mod_file}" .load)
-			[ "${old_mod}" = "php${apt_php_version}" ] && continue
-			run_cmd a2dismod "${old_mod}"
-		done
-		run_cmd a2enmod "php${apt_php_version}"
-	else
-		print_status 'Installing Apache...'
-		run_cmd apt-get install -y apache2
-
-		print_status 'Installing MySQL...'
-		run_cmd apt-get install -y mysql-server
-
-		print_status 'Installing PHP...'
-		run_cmd apt-get install -y "php${apt_php_version:-}" "php${apt_php_version:-}-mysql" "libapache2-mod-php${apt_php_version:-}"
-
-		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
-			if [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
-				print_status 'Installing crontab'
-				run_cmd apt-get install -y cron
-			fi
-		fi
+	elif [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
+		print_status 'Installing crontab'
+		run_cmd apt-get install -y cron
 	fi
 
 	print_status 'Installing PHP development libraries...'
