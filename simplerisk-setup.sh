@@ -134,7 +134,10 @@ validate_os_and_version(){
 	local valid
 	case "${OS}" in
 		"${UBUNTU_OSVAR}")
-			if [ "${VER}" = '22.04' ] || [[ "${VER}" = 24.* ]] || [[ "${VER}" = 25.* ]]; then
+			# LTS releases only - interim (non-LTS) releases like 25.04/25.10
+			# get ~9 months of upstream support and churn every 6 months, so
+			# they're intentionally not accepted here.
+			if [ "${VER}" = '22.04' ] || [[ "${VER}" = 24.* ]] || [[ "${VER}" = 26.* ]]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
@@ -154,35 +157,22 @@ validate_os_and_version(){
 				SETUP_TYPE=rhel
 			fi;;
 		"${SLES_OSVAR}")
-			if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
-				valid=y
-				local php_module
-				# Grab module where php8 is available
-				php_module=$(zypper search-packages php8 | awk '/^php8[[:space:]]/ { sub(/\(.*/, ""); sub(/^php8[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); print }')
-				# Check that the PHP module is active. suseconnect reports
-				# "Activated" on self-registered systems and "Installed" on
-				# SUSE Manager-managed systems; the status line follows the
-				# module name line in the output, so use grep -A1 to capture
-				# both lines before checking.
-				# Guard against an empty php_module — an empty -F pattern would
-				# match every line and make the check a silent no-op.
-				if [ -z "${php_module}" ]; then
-					print_error_message "Could not detect the PHP 8 module name via zypper. Ensure the Web and Scripting Module is activated in your SLES subscription."
-				fi
-				if ! sudo suseconnect --list-extensions | grep -A1 -F "$php_module" | grep -qE "Activated|Installed"; then
-					print_error_message "$php_module is not enabled on your subscription. Please enable it before running this installer."
-				fi
-				if [ ! -v HEADLESS ]; then
-					read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [ Yes / (No) ]: ' answer < /dev/tty
-					case "${answer}" in
-						Yes|yes|Y|y ) SETUP_TYPE=suse;;
-						* ) exit 1;;
-					esac
-				else
-					echo "This will install postfix. You will need to configure it later."
-					SETUP_TYPE=suse
-				fi
-			fi;;
+			# SLES 15 (all service packs) is not supported: SimpleRisk's
+			# current release requires PHP >= 8.3 (Composer platform check),
+			# and SLES 15's own repositories cap out at PHP 8.2 (the php8
+			# package) with no upgrade path. openSUSE's community
+			# devel:languages:php OBS project, which sometimes backports a
+			# newer PHP to older releases, has dropped 15.6 support entirely
+			# and only targets the next major release (16.0), which is not
+			# yet generally available for SLES. openSUSE Leap 16.0 already
+			# ships PHP 8.4 natively, so SLES 16 (once released) should be a
+			# viable target - but setup_suse()/uninstall_suse() below are
+			# written entirely around SLES 15's package names, module
+			# structure, and MySQL repo RPM naming
+			# (mysql84-community-release-sl15), so adding SLES 16 support
+			# needs its own dedicated pass, not just changing this version
+			# check.
+			print_error_message "SLES/openSUSE is not currently supported: SimpleRisk requires PHP >= 8.3, and SLES 15's repositories only offer PHP 8.2 with no upgrade path currently available.";;
 		*)
 			local unknown=y;;
 	esac
@@ -487,8 +477,10 @@ setup_ubuntu_debian(){
 	print_status 'Populating apt-get cache...'
 	run_cmd apt-get update
 
-	# Add PHP8/MySQL repos for Debian
-	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+	# Add the Sury PHP8 repo. Debian also gets MySQL's own repo here (Ubuntu
+	# keeps whatever MySQL/MariaDB lamp-server^ bundles - see below - since
+	# only the PHP version, not MySQL provisioning, is the problem there).
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ] || [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		run_cmd mkdir -p /etc/apt/keyrings
 		local apt_php_version=8.5
 
@@ -509,10 +501,12 @@ setup_ubuntu_debian(){
 		fi
 		exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
 
-		print_status 'Adding MySQL 8 repository'
-		# Download the signing key directly from MySQL (more reliable than keyservers).
-		exec_cmd "curl -fsSL '$MYSQL_KEY_URL' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mysql.gpg"
-		exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
+		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+			print_status 'Adding MySQL 8 repository'
+			# Download the signing key directly from MySQL (more reliable than keyservers).
+			exec_cmd "curl -fsSL '$MYSQL_KEY_URL' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mysql.gpg"
+			exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
+		fi
 
 		print_status 'Re-populating apt-get cache with added repos...'
 		run_cmd apt-get update
@@ -526,6 +520,22 @@ setup_ubuntu_debian(){
 		run_cmd apt-get install -y 'lamp-server^'
 		print_status 'Installing cron...'
 		run_cmd apt-get install -y cron
+
+		# lamp-server^ installs whatever PHP version Ubuntu's own archive
+		# defaults to for this release (e.g. 8.1 on 22.04), which can be
+		# older than SimpleRisk's Composer platform requirement. Install the
+		# pinned Sury version from the repo added above and switch Apache's
+		# active PHP module to it, without touching the MySQL/Apache
+		# packages lamp-server^ already installed.
+		print_status "Installing PHP ${apt_php_version} from Ondrej's repository..."
+		run_cmd apt-get install -y "php${apt_php_version}" "php${apt_php_version}-mysql" "libapache2-mod-php${apt_php_version}"
+		for old_mod_file in /etc/apache2/mods-enabled/php*.load; do
+			[ -e "${old_mod_file}" ] || continue
+			old_mod=$(basename "${old_mod_file}" .load)
+			[ "${old_mod}" = "php${apt_php_version}" ] && continue
+			run_cmd a2dismod "${old_mod}"
+		done
+		run_cmd a2enmod "php${apt_php_version}"
 	else
 		print_status 'Installing Apache...'
 		run_cmd apt-get install -y apache2
@@ -967,6 +977,13 @@ EOF
 
 	print_status 'Restarting MySQL to load the new configuration...'
 	run_cmd systemctl restart mysql
+	# The SUSE mysql-community-server package's /etc/my.cnf has no
+	# `!includedir /etc/my.cnf.d` directive, so the drop-in above is never
+	# read - apply the same setting live as a safety net, matching the
+	# CentOS/RHEL path's handling of the same MySQL 8.4+ behavior.
+	exec_cmd "mysql -uroot -p\"${NEW_MYSQL_ROOT_PASSWORD}\" \
+		-e \"SET GLOBAL sql_mode='NO_ENGINE_SUBSTITUTION';\" \
+		2>/dev/null"
 
 	print_status 'Removing the SimpleRisk database file...'
 	run_cmd rm -r /var/www/simplerisk/database.sql
@@ -1017,16 +1034,25 @@ uninstall_ubuntu_debian(){
 	run_cmd_nobail rm -rf /var/log/simplerisk
 
 	print_status 'Removing installed packages...'
-	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin"
+	# sensible-mda is a dependency of sendmail with its own hard Depends on
+	# the mail-transport-agent virtual package. Left out of this purge, apt
+	# has to keep that dependency satisfied by auto-installing a replacement
+	# MTA (courier-mta, pulling in ~40 packages including a full C build
+	# toolchain) instead of just removing sensible-mda alongside sendmail.
+	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin sensible-mda"
 	run_cmd_nobail apt-get autoremove -y
 	run_cmd_nobail apt-get autoclean
 
-	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ] || [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		print_status 'Removing added repositories and keys...'
+		# Both OSes add the Sury PHP repo; only Debian adds MySQL's own repo
+		# (Ubuntu keeps whatever MySQL/MariaDB lamp-server^ installed).
 		run_cmd_nobail rm -f /etc/apt/sources.list.d/sury-php.list
-		run_cmd_nobail rm -f /etc/apt/sources.list.d/mysql.list
 		run_cmd_nobail rm -f /etc/apt/keyrings/sury-php.gpg
-		run_cmd_nobail rm -f /etc/apt/trusted.gpg.d/mysql.gpg
+		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+			run_cmd_nobail rm -f /etc/apt/sources.list.d/mysql.list
+			run_cmd_nobail rm -f /etc/apt/trusted.gpg.d/mysql.gpg
+		fi
 		run_cmd_nobail apt-get update
 	fi
 
@@ -1121,7 +1147,11 @@ uninstall_suse(){
 
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
-	run_cmd_nobail zypper -n autoremove
+	# zypper has no built-in orphan-dependency cleanup equivalent to
+	# `apt-get autoremove`/`dnf autoremove` (a prior `zypper -n autoremove`
+	# call here always failed with "Unknown command", aborting the rest of
+	# uninstall_suse under set -e before the MySQL repo, firewall rules, and
+	# password file below were ever removed).
 
 	print_status 'Removing MySQL repository and drop-in config...'
 	exec_cmd_nobail 'rpm -e mysql84-community-release-sl15 2>/dev/null || true'

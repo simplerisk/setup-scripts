@@ -1,0 +1,26 @@
+FROM debian:13
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        sudo \
+        curl \
+        wget \
+        lsb-release \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# MySQL uses native AIO by default, which fails on Docker's overlayfs storage driver.
+RUN mkdir -p /etc/mysql/conf.d && \
+    printf '[mysqld]\ninnodb_use_native_aio=0\n' > /etc/mysql/conf.d/docker.cnf
+
+# MySQL 8.4 community server on Debian ships only systemd units (no init.d script).
+# This wrapper lets `service mysql start/stop/restart/status` work in a non-systemd
+# container by invoking mysqld directly via the helpers bundled with the package.
+# The script is kept in a separate file to avoid heredoc parsing issues across
+# different Docker builder versions.
+COPY mysql-init-debian.sh /etc/init.d/mysql
+RUN chmod +x /etc/init.d/mysql
+
+CMD ["/bin/bash"]
