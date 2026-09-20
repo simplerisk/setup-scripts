@@ -17,15 +17,19 @@ RUN apt-get update && \
 RUN mkdir -p /etc/mysql/conf.d && \
     printf '[mysqld]\ninnodb_use_native_aio=0\n' > /etc/mysql/conf.d/docker.cnf
 
-# DENY all service operations during the lamp-server^ pre-install below.
-# MySQL's post-install shutdown times out inside Docker; denying start/stop
-# lets dpkg initialise the data directory without triggering the timeout.
+# DENY all service operations during the apache2/mysql-server pre-install
+# below. MySQL's post-install shutdown times out inside Docker; denying
+# start/stop lets dpkg initialise the data directory without triggering
+# the timeout.
 RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && \
     chmod +x /usr/sbin/policy-rc.d
 
-# Pre-install lamp-server^ so packages are already present for the test run.
+# Pre-install the same explicit packages simplerisk-setup.sh installs
+# (apache2, mysql-server - PHP comes from the Sury repo the script adds
+# itself). Deliberately not the lamp-server^ metapackage: see
+# Dockerfile.ubuntu-22.04 for why.
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y lamp-server^ && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y apache2 mysql-server && \
     rm -rf /var/lib/apt/lists/*
 
 # Switch back to ALLOW so the setup script can start/stop services normally.
