@@ -157,35 +157,22 @@ validate_os_and_version(){
 				SETUP_TYPE=rhel
 			fi;;
 		"${SLES_OSVAR}")
-			if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
-				valid=y
-				local php_module
-				# Grab module where php8 is available
-				php_module=$(zypper search-packages php8 | awk '/^php8[[:space:]]/ { sub(/\(.*/, ""); sub(/^php8[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); print }')
-				# Check that the PHP module is active. suseconnect reports
-				# "Activated" on self-registered systems and "Installed" on
-				# SUSE Manager-managed systems; the status line follows the
-				# module name line in the output, so use grep -A1 to capture
-				# both lines before checking.
-				# Guard against an empty php_module — an empty -F pattern would
-				# match every line and make the check a silent no-op.
-				if [ -z "${php_module}" ]; then
-					print_error_message "Could not detect the PHP 8 module name via zypper. Ensure the Web and Scripting Module is activated in your SLES subscription."
-				fi
-				if ! sudo suseconnect --list-extensions | grep -A1 -F "$php_module" | grep -qE "Activated|Installed"; then
-					print_error_message "$php_module is not enabled on your subscription. Please enable it before running this installer."
-				fi
-				if [ ! -v HEADLESS ]; then
-					read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [ Yes / (No) ]: ' answer < /dev/tty
-					case "${answer}" in
-						Yes|yes|Y|y ) SETUP_TYPE=suse;;
-						* ) exit 1;;
-					esac
-				else
-					echo "This will install postfix. You will need to configure it later."
-					SETUP_TYPE=suse
-				fi
-			fi;;
+			# SLES 15 (all service packs) is not supported: SimpleRisk's
+			# current release requires PHP >= 8.3 (Composer platform check),
+			# and SLES 15's own repositories cap out at PHP 8.2 (the php8
+			# package) with no upgrade path. openSUSE's community
+			# devel:languages:php OBS project, which sometimes backports a
+			# newer PHP to older releases, has dropped 15.6 support entirely
+			# and only targets the next major release (16.0), which is not
+			# yet generally available for SLES. openSUSE Leap 16.0 already
+			# ships PHP 8.4 natively, so SLES 16 (once released) should be a
+			# viable target - but setup_suse()/uninstall_suse() below are
+			# written entirely around SLES 15's package names, module
+			# structure, and MySQL repo RPM naming
+			# (mysql84-community-release-sl15), so adding SLES 16 support
+			# needs its own dedicated pass, not just changing this version
+			# check.
+			print_error_message "SLES/openSUSE is not currently supported: SimpleRisk requires PHP >= 8.3, and SLES 15's repositories only offer PHP 8.2 with no upgrade path currently available.";;
 		*)
 			local unknown=y;;
 	esac
