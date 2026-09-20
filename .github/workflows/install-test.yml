@@ -3,8 +3,13 @@ name: SimpleRisk Install/Uninstall Tests
 on:
   push:
     branches: [main, "feature/**"]
+    paths: &test-paths
+      - simplerisk-setup.sh
+      - tests/**
+      - .github/workflows/install-test.yml
   pull_request:
     branches: [main]
+    paths: *test-paths
   workflow_dispatch:
 
 jobs:
