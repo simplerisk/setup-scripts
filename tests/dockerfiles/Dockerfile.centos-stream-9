@@ -9,6 +9,20 @@ ENV container=docker
 RUN dnf -y install --allowerasing curl wget sudo cronie which && \
     dnf clean all
 
+# The base image's default nsswitch.conf lists `sss` (SSSD) ahead of `files`
+# for passwd/group lookups, but SSSD is neither installed nor running here.
+# crond's PAM account/session check (initgroups() for the job's user) then
+# fails outright - "Authentication service cannot retrieve authentication
+# info" - instead of falling through to /etc/passwd, silently preventing
+# every cron.d job from ever running as a non-root user. Real RHEL/CentOS
+# servers enrolled in SSSD (or not) have a consistent, working nsswitch
+# config either way; this minimal container just has a stale default with
+# nothing backing it. Strip sss so lookups go straight to files.
+RUN sed -i \
+    -e 's/^\(passwd:\s*\).*/\1files systemd/' \
+    -e 's/^\(group:\s*\).*/\1files systemd/' \
+    /etc/nsswitch.conf
+
 # MySQL uses native AIO by default, which fails on Docker's overlayfs driver.
 RUN mkdir -p /etc/my.cnf.d && \
     printf '[mysqld]\ninnodb_use_native_aio=0\n' > /etc/my.cnf.d/docker.cnf
