@@ -17,11 +17,22 @@ unit="${args[1]%.service}"
 
 start_mysqld() {
     mysqladmin ping --silent >/dev/null 2>&1 && return 0   # already running
+    mkdir -p /var/log/mysql && chown mysql:mysql /var/log/mysql
+    # Pre-create the log file with mysql ownership so mysqld (which drops to
+    # the mysql user before opening it) can write to it - a bare shell
+    # redirect below would otherwise create it root-owned and unwritable.
+    touch /var/log/mysql/mysqld.log && chown mysql:mysql /var/log/mysql/mysqld.log
     # mysqld_pre_systemd is the same helper the real mysql.service unit runs
     # as ExecStartPre; it's idempotent (skips init if the datadir is already
-    # populated) and writes the temp root password as a [Note] line to
-    # /var/log/mysql/mysqld.log for simplerisk-setup.sh to read.
-    /usr/bin/mysqld_pre_systemd
+    # populated) and internally runs `mysqld --initialize`, which is meant to
+    # write the temp root password as a [Note] line to /var/log/mysql/mysqld.log
+    # (per log-error in /etc/my.cnf) for simplerisk-setup.sh to read - but on
+    # some hosts (observed on GitHub Actions runners, not reproducible in local
+    # Docker Desktop testing) that Note only reaches mysqld_pre_systemd's own
+    # stdout/stderr, never the file. Redirect explicitly into the log file so
+    # the Note lands there regardless, matching the CentOS shim's same
+    # defensive redirect around its own `mysqld --initialize` call.
+    /usr/bin/mysqld_pre_systemd >>/var/log/mysql/mysqld.log 2>&1
     nohup /usr/sbin/mysqld --user=mysql >>/var/log/mysql/mysqld.log 2>&1 &
     local i=0
     while [ $i -lt 60 ]; do
