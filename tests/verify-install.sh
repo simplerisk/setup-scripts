@@ -149,6 +149,86 @@ check "HTTP request reaches the app (following any http->https redirect)" \
 check "SimpleRisk's default-admin-account page is actually rendered (not an error/default page)" \
     bash -c "curl -sk -L http://localhost/ | grep -q 'name=\"verify_create_default_admin_account\"'"
 
+# ── End-to-end: create the admin account, log in, check the health page ───────
+# Drives the real first-run flow with plain curl (no browser/JS dependency -
+# every step here is a server-side form POST) rather than just probing
+# individual endpoints, so a break anywhere in that chain - account creation,
+# login, or the app's own self-reported health - fails the build.
+#
+# This must be curl's/this script's *first* interaction with the app on this
+# container: SimpleRisk's simplerisk_base_url setting is written once, from
+# whichever host/port the very first request used, and is never recomputed
+# after that (get_base_url() checks the stored setting before ever looking at
+# the live request again). Since every check in this script - including the
+# ones above - already goes through the container's real internal address via
+# `docker exec ... curl https://localhost/...` with no host port published,
+# that's consistent for the whole run and this doesn't get a chance to drift.
+echo "--- End-to-end (create admin account -> log in -> health check) ---"
+
+E2E_DIR=$(mktemp -d)
+E2E_COOKIES="$E2E_DIR/cookies.txt"
+E2E_USER="ci-admin"
+E2E_PASS="CI-Test-Passw0rd!"
+E2E_EMAIL="ci-admin@example.com"
+
+curl -sk -c "$E2E_COOKIES" -b "$E2E_COOKIES" https://localhost/ -o "$E2E_DIR/00-fresh.html"
+
+curl -sk -c "$E2E_COOKIES" -b "$E2E_COOKIES" -L https://localhost/ \
+    --data-urlencode "username=${E2E_USER}" \
+    --data-urlencode "full_name=CI Admin" \
+    --data-urlencode "email=${E2E_EMAIL}" \
+    --data-urlencode "password=${E2E_PASS}" \
+    --data-urlencode "confirm_password=${E2E_PASS}" \
+    -d "verify_create_default_admin_account=CREATE" \
+    -o "$E2E_DIR/01-post-create.html"
+check "Default admin account was created (login page now shown)" \
+    grep -q 'name="authenticate"' "$E2E_DIR/01-post-create.html"
+
+E2E_CSRF=$(grep -oE 'name="csrf_token" value="[a-f0-9]+"' "$E2E_DIR/01-post-create.html" | grep -oE '[a-f0-9]{20,}')
+
+curl -sk -c "$E2E_COOKIES" -b "$E2E_COOKIES" -L https://localhost/ \
+    -d "csrf_token=${E2E_CSRF}" \
+    --data-urlencode "user=${E2E_USER}" \
+    --data-urlencode "pass=${E2E_PASS}" \
+    -d "submit=submit" \
+    -o "$E2E_DIR/02-post-login.html"
+check "Logged in as the newly-created admin account" \
+    grep -qi 'logout' "$E2E_DIR/02-post-login.html"
+
+# The health check flags the automation cron as failed if it hasn't run in
+# the past hour (cron/cron.php itself writes the cron_last_run setting on
+# every tick). The install's seed database already ships with a stale
+# cron_last_run value baked in (a fixture from whenever the .sql dump was
+# generated), so merely checking for a non-empty value would pass instantly
+# without ever seeing a real tick - require a value newer than when this
+# poll started instead. Right after a fresh install there may not have been
+# a full minute yet for the first real tick, so poll for up to 75s,
+# comfortably past one minute-boundary, rather than race it.
+CRON_POLL_START=$(date +%s)
+CRON_LAST_RUN=0
+for _ in $(seq 1 75); do
+    CRON_LAST_RUN=$(mysql -uroot --password="${MYSQL_ROOT_PW:-}" simplerisk -N -e \
+        "SELECT value FROM settings WHERE name = 'cron_last_run';" 2>/dev/null)
+    [ -n "${CRON_LAST_RUN:-}" ] && [ "${CRON_LAST_RUN}" -ge "${CRON_POLL_START}" ] 2>/dev/null && break
+    sleep 1
+done
+check "SimpleRisk's own automation cron has ticked at least once since this check started" \
+    bash -c "[ -n '${CRON_LAST_RUN:-}' ] && [ '${CRON_LAST_RUN:-0}' -ge '${CRON_POLL_START}' ]"
+
+curl -sk -c "$E2E_COOKIES" -b "$E2E_COOKIES" https://localhost/admin/health_check.php \
+    -o "$E2E_DIR/03-health-check.html" -w '%{http_code}' > "$E2E_DIR/03-health-check.code"
+E2E_HEALTH_CODE=$(cat "$E2E_DIR/03-health-check.code")
+check "Health check page loads (HTTP 200)" \
+    test "${E2E_HEALTH_CODE}" = "200"
+check "Health check: base URL matches the URL used to connect" \
+    grep -q 'Base URL matches the URL you are using to connect to SimpleRisk' "$E2E_DIR/03-health-check.html"
+check "Health check: communicated with the SimpleRisk API" \
+    grep -q 'Communicated with the SimpleRisk API successfully' "$E2E_DIR/03-health-check.html"
+check "Health check: no failed checks reported anywhere on the page" \
+    bash -c "! grep -q 'x-mark-5-16' '$E2E_DIR/03-health-check.html'"
+
+rm -rf "$E2E_DIR"
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Verification Summary ==="

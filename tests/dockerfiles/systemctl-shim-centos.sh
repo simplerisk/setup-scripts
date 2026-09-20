@@ -3,8 +3,17 @@
 # on CentOS/RHEL without requiring a running systemd PID 1.
 
 # Strip --quiet / --system / other flags; find the action and unit name.
+# --now is tracked separately (not just discarded) because real systemd
+# treats `enable --now` as enable *and* start - a real server would already
+# have the unit running from that command alone, so simplerisk-setup.sh
+# never issues a separate `start` for cron/crond.
+now_flag=
 args=()
 for arg in "$@"; do
+    if [[ "$arg" == "--now" ]]; then
+        now_flag=1
+        continue
+    fi
     [[ "$arg" == --* ]] && continue
     args+=("$arg")
 done
@@ -80,11 +89,17 @@ stop_httpd() {
     httpd -k stop 2>/dev/null || true
 }
 
+start_crond() {
+    pgrep crond >/dev/null 2>&1 && return 0
+    crond
+}
+
 case "$action" in
     start)
         case "$unit" in
             mysqld|mysql) start_mysqld ;;
             httpd)        start_httpd  ;;
+            crond|cron)   start_crond  ;;
             sendmail)     exit 0 ;;   # no-op: sendmail cannot run without systemd
             firewalld)    exit 0 ;;   # no-op: firewalld not available in Docker
             *) echo "systemctl shim: unsupported unit '$unit'" >&2; exit 1 ;;
@@ -105,15 +120,30 @@ case "$action" in
         case "$unit" in
             mysqld|mysql) mysqladmin ping --silent >/dev/null 2>&1 ;;
             httpd)        pgrep httpd >/dev/null 2>&1 ;;
+            crond|cron)   pgrep crond >/dev/null 2>&1 ;;
             *) exit 1 ;;
         esac ;;
     status)
         case "$unit" in
             mysqld|mysql) mysqladmin ping --silent >/dev/null 2>&1 && echo "active" || exit 3 ;;
             httpd)        pgrep httpd >/dev/null 2>&1 && echo "active" || exit 3 ;;
+            crond|cron)   pgrep crond >/dev/null 2>&1 && echo "active" || exit 3 ;;
             *) exit 3 ;;
         esac ;;
-    enable|disable|daemon-reload|mask|unmask|is-enabled|reset-failed)
+    enable)
+        # We don't manage boot-time units, but `enable --now` also means
+        # "start it now" on a real system - honor the --now part.
+        if [ -n "$now_flag" ]; then
+            case "$unit" in
+                mysqld|mysql) start_mysqld ;;
+                httpd)        start_httpd  ;;
+                crond|cron)   start_crond  ;;
+                *) exit 0 ;;
+            esac
+        else
+            exit 0
+        fi ;;
+    disable|daemon-reload|mask|unmask|is-enabled|reset-failed)
         exit 0 ;;   # no-op — we don't manage boot-time units
     *)
         echo "systemctl shim: unknown action '$action'" >&2; exit 1 ;;
