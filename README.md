@@ -1,21 +1,25 @@
 # SimpleRisk Setup Script
 
+[![SimpleRisk Install/Uninstall Tests](https://github.com/simplerisk/setup-scripts/actions/workflows/install-test.yml/badge.svg)](https://github.com/simplerisk/setup-scripts/actions/workflows/install-test.yml)
+
 ## Supported versions
 
-- Ubuntu LTS 22.04, 24.04, and 25.x
-  - Although it is possible to install on non-LTS versions in between the two most recent LTS versions or above the most
-    recent version specified above, we do not support them officially
+- Ubuntu LTS 22.04, 24.04, and 26.04
+  - Interim (non-LTS) Ubuntu releases are not supported; they get ~9 months of upstream support and churn every 6 months
 - Debian 13
 - CentOS Stream 9, 10
 - Red Hat Enterprise Linux (RHEL) 9, 10
-- SUSE Linux Enterprise Server (SLES) 15.x
+
+SUSE Linux Enterprise Server (SLES) is not currently supported: SimpleRisk requires PHP >= 8.3, and SLES 15's own
+repositories only offer PHP 8.2 with no upgrade path currently available. Support may return once a SLES release with a
+newer PHP is available.
 
 ## Instructions
 
 Run as root or insert `sudo -E` before `bash`:
 
-- `curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -`
-- `wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/master/simplerisk-setup.sh | bash -`
+- `curl -sL https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -`
+- `wget -qO- https://raw.githubusercontent.com/simplerisk/setup-scripts/main/simplerisk-setup.sh | bash -`
 
 ## `--help`
 
