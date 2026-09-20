@@ -212,12 +212,28 @@ for _ in $(seq 1 90); do
     sleep 1
 done
 if [ -z "${CRON_LAST_RUN:-}" ] || [ "${CRON_LAST_RUN:-0}" -lt "${CRON_POLL_START}" ] 2>/dev/null; then
-    echo "  --- cron diagnostics (tick not observed within the poll window) ---"
+    # One minute-boundary passed with nothing: replace the daemon with a
+    # foreground, verbosely-logged instance (bypassing syslog, which may not
+    # even be running) so its own parsing/exec diagnostics are actually
+    # visible, then give it one more minute-boundary before giving up.
+    (pkill -x crond || pkill -x cron) 2>/dev/null || true
+    sleep 1
+    ( (crond -n -x sch,proc,pars || cron -f) > /tmp/crond-debug.log 2>&1 & )
+    for _ in $(seq 1 65); do
+        CRON_LAST_RUN=$(mysql -uroot --password="${MYSQL_ROOT_PW:-}" simplerisk -N -e \
+            "SELECT value FROM settings WHERE name = 'cron_last_run';" 2>/dev/null)
+        [ -n "${CRON_LAST_RUN:-}" ] && [ "${CRON_LAST_RUN}" -ge "${CRON_POLL_START}" ] 2>/dev/null && break
+        sleep 1
+    done
+    echo "  --- cron diagnostics (tick not observed within the first poll window) ---"
     echo "  daemon: $(pgrep -af 'crond|cron ' 2>/dev/null || echo 'no cron/crond process found')"
     echo "  cron.d entry: $(ls -l /etc/cron.d/simplerisk 2>&1)"
     echo "  $(cat /etc/cron.d/simplerisk 2>&1)"
+    echo "  nsswitch.conf passwd/group lines: $(grep -E 'passwd|group' /etc/nsswitch.conf 2>&1 | tr '\n' ' ')"
     echo "  simplerisk.log, last 20 cron-related lines (any timeframe):"
     grep -i cron /var/log/simplerisk/simplerisk.log 2>/dev/null | tail -20
+    echo "  crond debug output (foreground, verbose restart), last 40 lines:"
+    tail -40 /tmp/crond-debug.log 2>/dev/null
     echo "  --- end cron diagnostics ---"
 fi
 check "SimpleRisk's own automation cron has ticked at least once since this check started" \
@@ -232,6 +248,11 @@ check "Health check: base URL matches the URL used to connect" \
     grep -q 'Base URL matches the URL you are using to connect to SimpleRisk' "$E2E_DIR/03-health-check.html"
 check "Health check: communicated with the SimpleRisk API" \
     grep -q 'Communicated with the SimpleRisk API successfully' "$E2E_DIR/03-health-check.html"
+if grep -q 'x-mark-5-16' "$E2E_DIR/03-health-check.html" 2>/dev/null; then
+    echo "  --- health check page has failing item(s) ---"
+    grep -oE 'x-mark-5-16[^&]*&nbsp;&nbsp;[^<]*' "$E2E_DIR/03-health-check.html" | sed -E 's/^.*&nbsp;&nbsp;/    - /'
+    echo "  --- end health check failures ---"
+fi
 check "Health check: no failed checks reported anywhere on the page" \
     bash -c "! grep -q 'x-mark-5-16' '$E2E_DIR/03-health-check.html'"
 
