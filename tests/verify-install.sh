@@ -215,7 +215,13 @@ for _ in $(seq 1 150); do
     sleep 1
 done
 if [ -z "${CRON_LAST_RUN:-}" ] || [ "${CRON_LAST_RUN:-0}" -lt "${CRON_POLL_START}" ] 2>/dev/null; then
-    echo "  (cron diagnostics: $(pgrep -af 'cron|crond' 2>/dev/null | grep -v "$$" || echo 'no cron/crond process found'))"
+    echo "  --- cron diagnostics (tick not observed within the poll window) ---"
+    echo "  daemon: $(pgrep -x crond 2>/dev/null || pgrep -x cron 2>/dev/null || echo 'no cron/crond process found')"
+    echo "  cron.d entry: $(ls -l /etc/cron.d/simplerisk 2>&1)"
+    echo "  $(cat /etc/cron.d/simplerisk 2>&1)"
+    echo "  simplerisk.log, last 20 cron-related lines (any timeframe):"
+    grep -i cron /var/log/simplerisk/simplerisk.log 2>/dev/null | tail -20
+    echo "  --- end cron diagnostics ---"
 fi
 check "SimpleRisk's own automation cron has ticked at least once since this check started" \
     bash -c "[ -n '${CRON_LAST_RUN:-}' ] && [ '${CRON_LAST_RUN:-0}' -ge '${CRON_POLL_START}' ]"
