@@ -115,6 +115,10 @@ for ext in mysqli mbstring xml curl gd zip intl ldap; do
     check "PHP extension '$ext' is loaded"           bash -c "php -m | grep -qi '$ext'"
 done
 
+# ── Network tools ────────────────────────────────────────────────────────────
+echo "--- Network tools ---"
+check "ping is installed (asset discovery)"          bash -c "command -v ping"
+
 # ── Web server (OS-conditional) ───────────────────────────────────────────────
 echo "--- Web server ---"
 if grep -qi suse /etc/os-release 2>/dev/null; then

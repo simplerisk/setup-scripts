@@ -631,6 +631,10 @@ setup_ubuntu_debian(){
 	run_cmd a2enmod ssl
 	run_cmd a2ensite default-ssl
 
+	print_status 'Installing ping...'
+	# ping is used by SimpleRisk's asset discovery and is absent from minimal images.
+	run_cmd apt-get install -y iputils-ping
+
 	print_status 'Installing sendmail...'
 	run_cmd apt-get install -y sendmail
 
@@ -761,6 +765,10 @@ setup_centos_rhel(){
 	print_status 'Installing mod_ssl'
 	run_cmd dnf -y install mod_ssl
 
+	print_status 'Installing ping'
+	# ping is used by SimpleRisk's asset discovery and is absent from minimal images.
+	run_cmd dnf -y install iputils
+
 	print_status 'Installing sendmail'
 	run_cmd dnf -y install sendmail sendmail-cf m4
 
@@ -878,6 +886,10 @@ setup_suse(){
 
 	print_status 'Installing Apache...'
 	run_cmd zypper -n install apache2
+
+	print_status 'Installing ping...'
+	# ping is used by SimpleRisk's asset discovery and is absent from minimal images.
+	run_cmd zypper -n install iputils
 
 	print_status 'Enabling Apache on reboot...'
 	run_cmd systemctl enable apache2
