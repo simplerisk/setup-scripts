@@ -8,7 +8,7 @@ readonly CENTOS_STREAM_OSVAR='CentOS Stream'
 readonly RHEL_OSVAR='Red Hat Enterprise Linux'
 readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
-readonly OPENSUSE_LEAP_OSVAR='openSUSE Leap'
+readonly SLES_15_SUPPORTED_SP="15"
 
 readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2025'
 readonly MYSQL_GPG_KEY='B7B3B788A8D3785C' # Key taken from https://dev.mysql.com/doc/refman/8.4/en/checking-gpg-signature.html
@@ -132,13 +132,9 @@ load_os_variables(){
 
 validate_os_and_version(){
 	local valid
-	local untested_note
 	case "${OS}" in
 		"${UBUNTU_OSVAR}")
-			# LTS releases only - interim (non-LTS) releases like 25.04/25.10
-			# get ~9 months of upstream support and churn every 6 months, so
-			# they're intentionally not accepted here.
-			if [ "${VER}" = '22.04' ] || [[ "${VER}" = 24.* ]] || [[ "${VER}" = 26.* ]]; then
+			if [ "${VER}" = '22.04' ] || [[ "${VER}" = 24.* ]] || [[ "${VER}" = 25.* ]]; then
 				valid=y
 				SETUP_TYPE=debian
 			fi;;
@@ -156,40 +152,34 @@ validate_os_and_version(){
 			if [[ "${VER}" = 9* ]] || [[ "${VER}" = 10* ]]; then
 				valid=y
 				SETUP_TYPE=rhel
-				# RHEL shares the exact same install code path as CentOS
-				# Stream (which CI does cover), but RHEL itself has never
-				# actually been run in CI: Red Hat's official container
-				# images require a paid subscription, and the free UBI
-				# images can't substitute (see README). Let the user know
-				# this specific OS is unverified, not just "supported".
-				untested_note="RHEL is not independently tested in CI (it shares its install code with CentOS Stream, which is tested) - see the README for why."
 			fi;;
 		"${SLES_OSVAR}")
-			# SLES 15 (all service packs, including SP7's PHP 8.3) is not
-			# supported here: even though SP7's release notes list PHP 8.3.x,
-			# there's no way to verify that install path - openSUSE Leap
-			# 15.x (which would normally serve as SLES 15's free/testable
-			# proxy) ended at 15.6, which is now EOL and still capped at PHP
-			# 8.2, and real SLES 15 containers require a paid SCC
-			# subscription. See the README's SLES caveat for the same
-			# reasoning in more detail.
-			#
-			# SLES 16.0 (see below) ships PHP 8.4 and is supported and
-			# CI-tested directly.
-			if [[ "${VER}" = 16.* ]]; then
+			if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
 				valid=y
-				SETUP_TYPE=suse
-			fi;;
-		"${OPENSUSE_LEAP_OSVAR}")
-			# Leap 16.0 ships PHP 8.4 (php8 package) and a real MySQL
-			# Community Server RPM (built for SLES 15) installs and runs on
-			# it cleanly - see setup_suse()/uninstall_suse() below. Point
-			# releases within 16.x are expected to stay compatible, mirroring
-			# how Ubuntu's 24.*/26.* are accepted above. Older Leap releases
-			# (15.x and earlier) cap out at PHP 8.2, same as SLES 15.
-			if [[ "${VER}" = 16.* ]]; then
-				valid=y
-				SETUP_TYPE=suse
+				# If php8 is installable from an enabled repo, the PHP module is
+				# already active. Check this first: once the module is active,
+				# "zypper search-packages" stops printing the module name and
+				# instead prints "Available in repo <repo>" lines, which cannot
+				# be matched against "suseconnect --list-extensions".
+				if ! zypper -n search --match-exact --type package php8 > /dev/null 2>&1; then
+					local php_module
+					# php8 is not in any enabled repo; grab the module that offers it
+					php_module=$(zypper search-packages php8 | awk '/^php8[[:space:]]/ { sub(/\(.*/, ""); sub(/^php8[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); print }')
+					if [ -z "${php_module}" ]; then
+						print_error_message "Could not detect the PHP 8 module name via zypper. Ensure the Web and Scripting Module is activated in your SLES subscription."
+					fi
+					print_error_message "$php_module is not enabled on your subscription. Please enable it before running this installer."
+				fi
+				if [ ! -v HEADLESS ]; then
+					read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [ Yes / (No) ]: ' answer < /dev/tty
+					case "${answer}" in
+						Yes|yes|Y|y ) SETUP_TYPE=suse;;
+						* ) exit 1;;
+					esac
+				else
+					echo "This will install postfix. You will need to configure it later."
+					SETUP_TYPE=suse
+				fi
 			fi;;
 		*)
 			local unknown=y;;
@@ -197,9 +187,6 @@ validate_os_and_version(){
 
 	if [ -n "${valid:-}" ]; then
 		echo "Detected OS is ${OS} ${VER}, which is supported by this script."
-		if [ -n "${untested_note:-}" ]; then
-			echo "NOTE: ${untested_note}"
-		fi
 	elif [ -z "${valid:-}" ] && [ ! -v unknown ]; then
 		echo "Detected OS is ${OS} ${VER}, but this version is not currently supported by this script."
 		exit 1
@@ -210,13 +197,13 @@ validate_os_and_version(){
 }
 
 perform_installation() {
-	# Sets SIMPLERISK_VERSION, SIMPLERISK_BUNDLE_SHA256, SIMPLERISK_DB_SHA256.
-	get_current_simplerisk_version
+	local current_simplerisk_version
+	current_simplerisk_version=$(get_current_simplerisk_version)
 
 	case "${SETUP_TYPE:-}" in
-		debian) setup_ubuntu_debian "$SIMPLERISK_VERSION";;
-		rhel) setup_centos_rhel "$SIMPLERISK_VERSION";;
-		suse) setup_suse "$SIMPLERISK_VERSION";;
+		debian) setup_ubuntu_debian "$current_simplerisk_version";;
+		rhel) setup_centos_rhel "$current_simplerisk_version";;
+		suse) setup_suse "$current_simplerisk_version";;
 		*) print_error_message "Could not validate the setup type. Check the perform_installation and validate_os_and_version functions.";;
 	esac
 
@@ -379,17 +366,10 @@ set_up_simplerisk() {
 	elif [ -d /var/www/html ]; then
 		run_cmd rm -r /var/www/html
 	fi
-	# run_cmd (array-safe, no shell re-evaluation) rather than exec_cmd/bash -c:
-	# ${2} is the version from get_current_simplerisk_version(), which is
-	# validated but this avoids ever interpolating it into a shell string
-	# regardless (see HackerOne #3764025). wget's own -P/-O flags replace the
-	# previous `cd DIR && wget ...` pattern.
-	run_cmd wget -P /var/www "https://simplerisk-downloads.s3.amazonaws.com/public/bundles/simplerisk-${2}.tgz"
-	verify_sha256 "/var/www/simplerisk-${2}.tgz" "$SIMPLERISK_BUNDLE_SHA256"
-	run_cmd tar -xvzf "/var/www/simplerisk-${2}.tgz" -C /var/www
+	exec_cmd "cd /var/www && wget https://simplerisk-downloads.s3.amazonaws.com/public/bundles/simplerisk-${2}.tgz"
+	exec_cmd "cd /var/www && tar xvzf simplerisk-${2}.tgz"
 	run_cmd rm -f "/var/www/simplerisk-${2}.tgz"
-	run_cmd wget -O /var/www/simplerisk/database.sql "https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql"
-	verify_sha256 /var/www/simplerisk/database.sql "$SIMPLERISK_DB_SHA256"
+	exec_cmd "cd /var/www/simplerisk && wget https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql -O database.sql"
 	run_cmd cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php
 	run_cmd chown -R "${1}:" /var/www/simplerisk
 	# Log directory/file creation, ownership, and permissions are handled by
@@ -397,20 +377,7 @@ set_up_simplerisk() {
 }
 
 set_up_backup_cronjob() {
-	# $1 receives the web-server account (www-data / apache / wwwrun).
-	# Installed as a system cron.d entry with that account in the user column,
-	# rather than appended to root's crontab: cron/cron.php is owned and
-	# writable by the web account (see set_up_simplerisk's chown -R), so
-	# running it as root would let anyone who can write that file escalate to
-	# root every minute. Running it as the web account instead means an
-	# overwritten cron.php only ever executes with the privileges the web
-	# account already has.
-	# Piped through tee rather than a literal `>` redirect: exec_cmd_nobail
-	# appends its own `> /dev/null 2>&1` to suppress non-debug output, and a
-	# second stdout redirect in the same command would win, truncating the
-	# file to empty instead of writing the cron entry.
-	exec_cmd "echo '* * * * * ${1} $(which php) -f /var/www/simplerisk/cron/cron.php' | tee /etc/cron.d/simplerisk"
-	run_cmd chmod 644 /etc/cron.d/simplerisk
+	exec_cmd "(crontab -l 2>/dev/null; echo '* * * * * $(which php) -f /var/www/simplerisk/cron/cron.php') | crontab -"
 }
 
 set_up_simplerisk_log() {
@@ -424,46 +391,7 @@ set_up_simplerisk_log() {
 }
 
 get_current_simplerisk_version() {
-	# Sets (intentionally not `local`, read by set_up_simplerisk() later):
-	#   SIMPLERISK_VERSION        - the release identifier, e.g. "20260909-001"
-	#   SIMPLERISK_BUNDLE_SHA256  - expected sha256 of the .tgz bundle
-	#   SIMPLERISK_DB_SHA256      - expected sha256 of the English database.sql
-	local releases_xml
-	releases_xml=$(curl -sL "https://updates.simplerisk.com/releases.xml")
-
-	SIMPLERISK_VERSION=$(printf '%s' "$releases_xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2)
-
-	# releases.xml versions are always "YYYYMMDD-NNN" (an 8-digit release date,
-	# a dash, a 1-4 digit release number). Reject anything else outright: this
-	# value is used to build the wget URLs below, and previously flowed
-	# unvalidated into a bash -c string - a compromised feed could inject
-	# shell metacharacters there and get root code execution during install
-	# (HackerOne #3764025).
-	if [[ ! "$SIMPLERISK_VERSION" =~ ^[0-9]{8}-[0-9]{1,4}$ ]]; then
-		print_error_message "Update feed returned an unexpected version string ('${SIMPLERISK_VERSION}'). Aborting rather than trust an unvalidated value."
-	fi
-
-	# Also capture the checksums releases.xml publishes for this same release,
-	# so set_up_simplerisk() can verify the downloaded bundle/database against
-	# them - defense in depth against the artifact hosts (S3, GitHub raw)
-	# being compromised independently of releases.xml itself, or a MITM on
-	# just the download step.
-	SIMPLERISK_BUNDLE_SHA256=$(printf '%s' "$releases_xml" | grep -oP '<bundle_sha256>\K[^<]+' | head -n1)
-	SIMPLERISK_DB_SHA256=$(printf '%s' "$releases_xml" | sed -n '/<en>/,/<\/en>/p' | grep -oP '<sha256>\K[^<]+' | head -n1)
-}
-
-# Aborts the install if a downloaded file's sha256 doesn't match what
-# releases.xml published for it. $1 = path to the downloaded file;
-# $2 = expected sha256 (from SIMPLERISK_BUNDLE_SHA256/SIMPLERISK_DB_SHA256).
-verify_sha256() {
-	local file="$1" expected="$2" actual
-	if [ -z "$expected" ]; then
-		print_error_message "No checksum was published in releases.xml for ${file}; refusing to trust an unverifiable download."
-	fi
-	actual=$(sha256sum "$file" | cut -d ' ' -f 1)
-	if [ "$actual" != "$expected" ]; then
-		print_error_message "Checksum mismatch for ${file}: expected ${expected}, got ${actual}. The downloaded file does not match releases.xml; aborting."
-	fi
+	curl -sL "https://updates.simplerisk.com/releases.xml" | grep -oP '<release version=(.*)>' | head -n1 | cut -d '"' -f 2
 }
 
 get_installed_php_version() {
@@ -507,9 +435,6 @@ bail() {
 }
 
 remove_backup_cronjob() {
-	run_cmd_nobail rm -f /etc/cron.d/simplerisk
-	# Also strip any legacy root-crontab entry left by installs from before
-	# the cron job was moved to run as the web-server account.
 	(crontab -l 2>/dev/null | grep -v 'simplerisk/cron/cron.php') | crontab - 2>/dev/null || true
 }
 
@@ -544,10 +469,8 @@ setup_ubuntu_debian(){
 	print_status 'Populating apt-get cache...'
 	run_cmd apt-get update
 
-	# Add the Sury PHP8 repo. Debian also gets MySQL's own repo here (Ubuntu
-	# keeps whatever MySQL/MariaDB lamp-server^ bundles - see below - since
-	# only the PHP version, not MySQL provisioning, is the problem there).
-	if [ "${OS}" = "${DEBIAN_OSVAR}" ] || [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
+	# Add PHP8/MySQL repos for Debian
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 		run_cmd mkdir -p /etc/apt/keyrings
 		local apt_php_version=8.5
 
@@ -568,12 +491,10 @@ setup_ubuntu_debian(){
 		fi
 		exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
 
-		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
-			print_status 'Adding MySQL 8 repository'
-			# Download the signing key directly from MySQL (more reliable than keyservers).
-			exec_cmd "curl -fsSL '$MYSQL_KEY_URL' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mysql.gpg"
-			exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
-		fi
+		print_status 'Adding MySQL 8 repository'
+		# Download the signing key directly from MySQL (more reliable than keyservers).
+		exec_cmd "curl -fsSL '$MYSQL_KEY_URL' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mysql.gpg"
+		exec_cmd "echo 'deb [signed-by=/etc/apt/trusted.gpg.d/mysql.gpg] https://repo.mysql.com/apt/$(lsb_release -si | tr '[:upper:]' '[:lower:]')/ $(lsb_release -sc) mysql-8.4-lts' | sudo tee /etc/apt/sources.list.d/mysql.list"
 
 		print_status 'Re-populating apt-get cache with added repos...'
 		run_cmd apt-get update
@@ -582,38 +503,28 @@ setup_ubuntu_debian(){
 	print_status 'Updating current packages (this may take a bit)...'
 	run_cmd apt-get dist-upgrade -qq --assume-yes
 
-	# Both OSes install the same explicit package set - Ubuntu previously
-	# used the lamp-server^ "task" metapackage instead, but that pulls in a
-	# large set of packages beyond the actual LAMP stack (CGI/Perl libraries,
-	# etc.) that SimpleRisk has no use for, and still needed the Sury PHP
-	# package installed and its Apache module swapped in afterward to
-	# override whatever older PHP lamp-server^ had already defaulted to.
-	# Installing the same explicit packages Debian already uses (now that
-	# Ubuntu gets the same Sury repo added above) gets the pinned PHP
-	# version directly, with nothing to swap out.
-	print_status 'Installing Apache...'
-	run_cmd apt-get install -y apache2
-
-	print_status 'Installing MySQL...'
-	run_cmd apt-get install -y mysql-server
-
-	print_status 'Installing PHP...'
-	run_cmd apt-get install -y "php${apt_php_version:-}" "php${apt_php_version:-}-mysql" "libapache2-mod-php${apt_php_version:-}"
-
 	if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
+		print_status 'Installing lamp-server...'
+		run_cmd apt-get install -y 'lamp-server^'
 		print_status 'Installing cron...'
 		run_cmd apt-get install -y cron
-	elif [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
-		print_status 'Installing crontab'
-		run_cmd apt-get install -y cron
-	fi
+	else
+		print_status 'Installing Apache...'
+		run_cmd apt-get install -y apache2
 
-	# Unlike apache2/mysql-server, the cron package's postinst does not
-	# reliably start the daemon in every environment (e.g. containers with
-	# policy-rc.d denying service auto-start by default). Every other OS
-	# branch explicitly enables/starts its cron daemon; do the same here.
-	print_status 'Ensuring cron is running...'
-	exec_cmd 'service cron status > /dev/null 2>&1 || service cron start'
+		print_status 'Installing MySQL...'
+		run_cmd apt-get install -y mysql-server
+
+		print_status 'Installing PHP...'
+		run_cmd apt-get install -y "php${apt_php_version:-}" "php${apt_php_version:-}-mysql" "libapache2-mod-php${apt_php_version:-}"
+
+		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
+			if [ "${VER}" = '12' ] || [ "${VER}" = '13' ]; then
+				print_status 'Installing crontab'
+				run_cmd apt-get install -y cron
+			fi
+		fi
+	fi
 
 	print_status 'Installing PHP development libraries...'
 	run_cmd apt-get install -y "php${apt_php_version:-}-dev"
@@ -630,10 +541,6 @@ setup_ubuntu_debian(){
 	run_cmd a2enmod rewrite
 	run_cmd a2enmod ssl
 	run_cmd a2ensite default-ssl
-
-	print_status 'Installing ping...'
-	# ping is used by SimpleRisk's asset discovery and is absent from minimal images.
-	run_cmd apt-get install -y iputils-ping
 
 	print_status 'Installing sendmail...'
 	run_cmd apt-get install -y sendmail
@@ -689,7 +596,7 @@ setup_ubuntu_debian(){
 	run_cmd rm -r /var/www/simplerisk/database.sql
 
 	print_status 'Setting up Backup cronjob...'
-	set_up_backup_cronjob 'www-data'
+	set_up_backup_cronjob
 
 	print_status 'Installing UFW firewall...'
 	run_cmd apt-get install -y ufw
@@ -765,10 +672,6 @@ setup_centos_rhel(){
 	print_status 'Installing mod_ssl'
 	run_cmd dnf -y install mod_ssl
 
-	print_status 'Installing ping'
-	# ping is used by SimpleRisk's asset discovery and is absent from minimal images.
-	run_cmd dnf -y install iputils
-
 	print_status 'Installing sendmail'
 	run_cmd dnf -y install sendmail sendmail-cf m4
 
@@ -832,7 +735,7 @@ EOF
 	run_cmd systemctl enable --now crond
 
 	print_status 'Setting up Backup cronjob...'
-	set_up_backup_cronjob 'apache'
+	set_up_backup_cronjob
 
 	print_status 'Enabling and starting the Apache web server...'
 	run_cmd systemctl enable httpd
@@ -887,10 +790,6 @@ setup_suse(){
 	print_status 'Installing Apache...'
 	run_cmd zypper -n install apache2
 
-	print_status 'Installing ping...'
-	# ping is used by SimpleRisk's asset discovery and is absent from minimal images.
-	run_cmd zypper -n install iputils
-
 	print_status 'Enabling Apache on reboot...'
 	run_cmd systemctl enable apache2
 
@@ -936,18 +835,21 @@ setup_suse(){
 	# "The Tokenizer extension is required for the routing attribute loader"),
 	# php8-ctype, php8-xmlreader, php8-xmlwriter. Note 'php-xml' does not exist
 	# on SUSE, and SimpleRisk's healthcheck only flags dom, so the others were
-	# silently missing. php8-cli is also separate here (unlike Debian/RHEL,
-	# where the base PHP package includes the CLI binary) and is needed for
-	# the backup cron job, which invokes `php` directly.
-	run_cmd zypper -n install php8 php8-cli php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php8-dom php8-openssl php8-tokenizer php8-ctype php8-xmlreader php8-xmlwriter
+	# silently missing.
+	run_cmd zypper -n install php8 php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php8-dom php8-openssl php8-tokenizer php8-ctype php8-xmlreader php8-xmlwriter
 
-	print_status 'Enabling PHP and Apache modules...'
-	# a2enmod is idempotent and self-appends the needed LoadModule line, so
-	# this runs unconditionally rather than only on modules that aren't
-	# already enabled by default (e.g. php8/ssl on Leap 16.0).
-	for module in php8 rewrite ssl mod_ssl; do
-		run_cmd a2enmod "$module"
-	done
+	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
+		print_status 'Enabling PHP and Apache modules...'
+		for module in php8 rewrite ssl mod_ssl; do
+			run_cmd a2enmod "$module"
+		done
+	fi
+
+	print_status 'Enabling Rewrite Module for Apache...'
+	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
+		grep -qF 'mod_rewrite.so' /etc/apache2/loadmodule.conf 2>/dev/null || \
+			echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
+	fi
 
 	print_status 'Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert'
 	grep -qxF 'Listen 443' /etc/apache2/vhosts.d/simplerisk.conf 2>/dev/null || echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf
@@ -1047,13 +949,6 @@ EOF
 
 	print_status 'Restarting MySQL to load the new configuration...'
 	run_cmd systemctl restart mysql
-	# The SUSE mysql-community-server package's /etc/my.cnf has no
-	# `!includedir /etc/my.cnf.d` directive, so the drop-in above is never
-	# read - apply the same setting live as a safety net, matching the
-	# CentOS/RHEL path's handling of the same MySQL 8.4+ behavior.
-	exec_cmd "mysql -uroot -p\"${NEW_MYSQL_ROOT_PASSWORD}\" \
-		-e \"SET GLOBAL sql_mode='NO_ENGINE_SUBSTITUTION';\" \
-		2>/dev/null"
 
 	print_status 'Removing the SimpleRisk database file...'
 	run_cmd rm -r /var/www/simplerisk/database.sql
@@ -1066,7 +961,7 @@ EOF
 	run_cmd systemctl enable --now cron
 
 	print_status 'Setting up Backup cronjob...'
-	set_up_backup_cronjob 'wwwrun'
+	set_up_backup_cronjob
 
 	print_status 'Installing and enabling firewall...'
 	run_cmd zypper -n install firewalld
@@ -1104,25 +999,16 @@ uninstall_ubuntu_debian(){
 	run_cmd_nobail rm -rf /var/log/simplerisk
 
 	print_status 'Removing installed packages...'
-	# sensible-mda is a dependency of sendmail with its own hard Depends on
-	# the mail-transport-agent virtual package. Left out of this purge, apt
-	# has to keep that dependency satisfied by auto-installing a replacement
-	# MTA (courier-mta, pulling in ~40 packages including a full C build
-	# toolchain) instead of just removing sensible-mda alongside sendmail.
-	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin sensible-mda"
+	exec_cmd_nobail "apt-get purge -y 'php*' 'libapache2-mod-php*' apache2 apache2-utils apache2-bin mysql-server mysql-client mysql-common sendmail sendmail-bin"
 	run_cmd_nobail apt-get autoremove -y
 	run_cmd_nobail apt-get autoclean
 
-	if [ "${OS}" = "${DEBIAN_OSVAR}" ] || [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
+	if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 		print_status 'Removing added repositories and keys...'
-		# Both OSes add the Sury PHP repo; only Debian adds MySQL's own repo
-		# (Ubuntu keeps whatever MySQL/MariaDB lamp-server^ installed).
 		run_cmd_nobail rm -f /etc/apt/sources.list.d/sury-php.list
+		run_cmd_nobail rm -f /etc/apt/sources.list.d/mysql.list
 		run_cmd_nobail rm -f /etc/apt/keyrings/sury-php.gpg
-		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
-			run_cmd_nobail rm -f /etc/apt/sources.list.d/mysql.list
-			run_cmd_nobail rm -f /etc/apt/trusted.gpg.d/mysql.gpg
-		fi
+		run_cmd_nobail rm -f /etc/apt/trusted.gpg.d/mysql.gpg
 		run_cmd_nobail apt-get update
 	fi
 
@@ -1217,11 +1103,7 @@ uninstall_suse(){
 
 	print_status 'Removing installed packages...'
 	exec_cmd_nobail "zypper -n remove apache2 mysql-community-server 'php8*' apache2-mod_php8"
-	# zypper has no built-in orphan-dependency cleanup equivalent to
-	# `apt-get autoremove`/`dnf autoremove` (a prior `zypper -n autoremove`
-	# call here always failed with "Unknown command", aborting the rest of
-	# uninstall_suse under set -e before the MySQL repo, firewall rules, and
-	# password file below were ever removed).
+	run_cmd_nobail zypper -n autoremove
 
 	print_status 'Removing MySQL repository and drop-in config...'
 	exec_cmd_nobail 'rpm -e mysql84-community-release-sl15 2>/dev/null || true'
