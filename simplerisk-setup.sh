@@ -888,13 +888,13 @@ EOF
 	print_status 'Configuring MySQL...'
 	set_up_database	/var/log/mysqld.log
 
-	# Write sql_mode to a dedicated drop-in file so it is read last (alphabetically
-	# "zz-") and is not overridden by any vendor-supplied file in /etc/my.cnf.d/.
-	# The same setting is applied via SET GLOBAL after the restart as a safety net
-	# for MySQL 8.4+ where config-file precedence changed.
-	printf '[mysqld]\nsql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION\n' \
-		> /etc/my.cnf.d/zz-simplerisk.cnf
-	set_mysql_password_policy /etc/my.cnf.d/zz-simplerisk.cnf
+	# Write sql_mode and the password policy straight into /etc/my.cnf. The MySQL Community
+	# package's /etc/my.cnf has no `!includedir /etc/my.cnf.d` line, so a drop-in under
+	# /etc/my.cnf.d is never read: the settings applied until the first MySQL restart and then
+	# reverted to strict mode with a minimum password length of 8 (the cron job then logged
+	# "Incorrect DATE value" every minute). The SET GLOBAL below applies the mode immediately.
+	printf '\n[mysqld]\nsql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION\n' >> /etc/my.cnf
+	set_mysql_password_policy /etc/my.cnf
 
 	print_status 'Restarting MySQL to load the new configuration...'
 	run_cmd systemctl restart mysqld
@@ -1129,22 +1129,19 @@ EOF
 	run_cmd systemctl restart apache2
 
 	print_status 'Configuring MySQL...'
-	# Write sql_mode to a drop-in file so it takes precedence and is not
-	# duplicated across /etc/my.cnf.  Also strip STRICT_TRANS_TABLES from
+	# Write sql_mode straight into /etc/my.cnf: this package's /etc/my.cnf has no
+	# `!includedir /etc/my.cnf.d` line, so a drop-in under /etc/my.cnf.d is never read and the
+	# setting would be lost at the first MySQL restart. Also strip STRICT_TRANS_TABLES from
 	# any existing entries in the base config.
-	printf '[mysqld]\nsql_mode=NO_ENGINE_SUBSTITUTION\n' \
-		> /etc/my.cnf.d/zz-simplerisk.cnf
 	run_cmd sed -i 's/,STRICT_TRANS_TABLES//g' /etc/my.cnf
+	printf '\n[mysqld]\nsql_mode=NO_ENGINE_SUBSTITUTION\n' >> /etc/my.cnf
 	set_mysql_password_policy /etc/my.cnf
 
 	set_up_database /var/log/mysql/mysqld.log
 
 	print_status 'Restarting MySQL to load the new configuration...'
 	run_cmd systemctl restart mysql
-	# The SUSE mysql-community-server package's /etc/my.cnf has no
-	# `!includedir /etc/my.cnf.d` directive, so the drop-in above is never
-	# read - apply the same setting live as a safety net, matching the
-	# CentOS/RHEL path's handling of the same MySQL 8.4+ behavior.
+	# Apply the same setting to the running server (the restart above already read it from /etc/my.cnf).
 	exec_cmd "mysql -uroot -p\"${NEW_MYSQL_ROOT_PASSWORD}\" \
 		-e \"SET GLOBAL sql_mode='NO_ENGINE_SUBSTITUTION';\" \
 		2>/dev/null"
