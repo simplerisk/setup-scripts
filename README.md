@@ -16,6 +16,11 @@
 - openSUSE Leap 16.0
   - Leap 16.0 ships PHP 8.4 natively; a real MySQL Community Server RPM (built for SLES 15) installs and runs on it
     without issue - see `setup_suse`/`uninstall_suse` in `simplerisk-setup.sh`.
+- SUSE Linux Enterprise Server (SLES) 15 SP7 or later
+  - SLES 15 SP7 is the first service pack whose Web and Scripting module ships PHP 8.3 (SimpleRisk requires PHP 8.3+);
+    SP6 and earlier ship PHP 8.2 or older and are rejected. It requires an active SUSE subscription with the Web and
+    Scripting module activated via `suseconnect`, so it is verified on a real SLES 15 SP7 instance in SimpleRisk's
+    private CI rather than in this repository's public CI.
 - SUSE Linux Enterprise Server (SLES) 16.0
   - SLES 16.0 and openSUSE Leap 16.0 share the exact same package builds (`setup_suse`/`uninstall_suse` is one code path
     for both), and unlike RHEL, SLES 16 *is* independently tested: SUSE's free, unauthenticated BCI (Base Container
@@ -28,13 +33,10 @@ A few versions are excluded on purpose, not simply because they haven't been tri
 
 - **openSUSE Tumbleweed** - a rolling release, not a stable/LTS-equivalent target. Even though it always carries a
   current PHP, this script intentionally only targets openSUSE's stable branch (Leap).
-- **openSUSE Leap 15.x and earlier** - capped at PHP 8.2 (the same `php8` package SLES 15 ships) with no upgrade path,
+- **openSUSE Leap 15.x and earlier** - capped at PHP 8.2 (the same PHP 8.2 `php8` package as SLES 15 SP6) with no upgrade path,
   and Leap 15.6, the last 15.x release, is now end-of-life.
-- **SUSE Linux Enterprise Server (SLES) 15** (all service packs) - not supported, and won't be added without a way to
-  verify it. SLES 15 SP7's release notes list PHP 8.3.x as available, which would clear SimpleRisk's PHP >= 8.3
-  requirement, but that can't currently be confirmed: openSUSE Leap 15.x, which would otherwise serve as SLES 15's
-  free/testable proxy the way Leap 16.0 does for SLES 16.0, ended at 15.6 (see above) and never exceeded PHP 8.2, and
-  real SLES 15 container images require a paid SCC subscription to test directly.
+- **SUSE Linux Enterprise Server (SLES) 15 SP6 and earlier** - capped at PHP 8.2 or older, below SimpleRisk's PHP >= 8.3
+  requirement.
 - **Ubuntu releases older than 22.04** (18.04, 20.04, etc.), and interim (non-LTS) releases - see the LTS-only policy
   above.
 - **Debian releases older than 13** (11, 12, etc.) - out of scope; only the version listed above is targeted.

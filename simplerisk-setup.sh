@@ -8,6 +8,10 @@ readonly CENTOS_STREAM_OSVAR='CentOS Stream'
 readonly RHEL_OSVAR='Red Hat Enterprise Linux'
 readonly RHELS_OSVAR='Red Hat Enterprise Linux Server'
 readonly SLES_OSVAR='SLES'
+readonly SLES_15_SUPPORTED_SP="15"
+# SimpleRisk requires PHP 8.3+. The SLES 15 Web and Scripting module ships PHP 8.3 only from SP7 onward
+# (SP6 ships 8.2, SP5 and earlier 8.0), so older service packs cannot run SimpleRisk.
+readonly SLES_15_MIN_SP=7
 readonly OPENSUSE_LEAP_OSVAR='openSUSE Leap'
 
 readonly MYSQL_KEY_URL='https://repo.mysql.com/RPM-GPG-KEY-mysql-2025'
@@ -130,6 +134,16 @@ load_os_variables(){
 	fi
 }
 
+# Aborts if the detected SLES 15 service pack is older than SLES_15_MIN_SP
+require_sles_min_sp(){
+	local sp="${VER#"${SLES_15_SUPPORTED_SP}"}"
+	sp="${sp#.}"
+	sp="${sp:-0}"
+	if ! [[ "${sp}" =~ ^[0-9]+$ ]] || (( sp < SLES_15_MIN_SP )); then
+		print_error_message "SLES ${VER} is not supported: its PHP is older than the 8.3 SimpleRisk requires. SLES 15 SP${SLES_15_MIN_SP} or later is required."
+	fi
+}
+
 validate_os_and_version(){
 	local valid
 	local untested_note
@@ -165,18 +179,36 @@ validate_os_and_version(){
 				untested_note="RHEL is not independently tested in CI (it shares its install code with CentOS Stream, which is tested) - see the README for why."
 			fi;;
 		"${SLES_OSVAR}")
-			# SLES 15 (all service packs, including SP7's PHP 8.3) is not
-			# supported here: even though SP7's release notes list PHP 8.3.x,
-			# there's no way to verify that install path - openSUSE Leap
-			# 15.x (which would normally serve as SLES 15's free/testable
-			# proxy) ended at 15.6, which is now EOL and still capped at PHP
-			# 8.2, and real SLES 15 containers require a paid SCC
-			# subscription. See the README's SLES caveat for the same
-			# reasoning in more detail.
-			#
-			# SLES 16.0 (see below) ships PHP 8.4 and is supported and
-			# CI-tested directly.
-			if [[ "${VER}" = 16.* ]]; then
+			if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
+				require_sles_min_sp
+				valid=y
+				# If php8 is installable from an enabled repo, the PHP module is
+				# already active. Check this first: once the module is active,
+				# "zypper search-packages" stops printing the module name and
+				# instead prints "Available in repo <repo>" lines, which cannot
+				# be matched against "suseconnect --list-extensions".
+				if ! zypper -n search --match-exact --type package php8 > /dev/null 2>&1; then
+					local php_module
+					# php8 is not in any enabled repo; grab the module that offers it
+					php_module=$(zypper search-packages php8 | awk '/^php8[[:space:]]/ { sub(/\(.*/, ""); sub(/^php8[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); print }')
+					if [ -z "${php_module}" ]; then
+						print_error_message "Could not detect the PHP 8 module name via zypper. Ensure the Web and Scripting Module is activated in your SLES subscription."
+					fi
+					print_error_message "$php_module is not enabled on your subscription. Please enable it before running this installer."
+				fi
+				if [ ! -v HEADLESS ]; then
+					read -r -p 'Before continuing, SLES 15 does not have sendmail available. Proceed? [ Yes / (No) ]: ' answer < /dev/tty
+					case "${answer}" in
+						Yes|yes|Y|y ) SETUP_TYPE=suse;;
+						* ) exit 1;;
+					esac
+				else
+					echo "This will install postfix. You will need to configure it later."
+					SETUP_TYPE=suse
+				fi
+			elif [[ "${VER}" = 16.* ]]; then
+				# SLES 16.0 ships PHP 8.4 and shares its install path with openSUSE Leap 16.0
+				# (the free SLE BCI image makes it CI-testable directly).
 				valid=y
 				SETUP_TYPE=suse
 			fi;;
@@ -939,7 +971,7 @@ setup_suse(){
 	# silently missing. php8-cli is also separate here (unlike Debian/RHEL,
 	# where the base PHP package includes the CLI binary) and is needed for
 	# the backup cron job, which invokes `php` directly.
-	run_cmd zypper -n install php8 php8-cli php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php8-dom php8-openssl php8-tokenizer php8-ctype php8-xmlreader php8-xmlwriter
+	run_cmd zypper -n install php8 php8-cli php8-fileinfo php8-mysql apache2-mod_php8 php8-ldap php8-curl php8-zlib php8-phar php8-mbstring php8-intl php8-posix php8-gd php8-zip php8-dom php8-openssl php8-tokenizer php8-ctype php8-xmlreader php8-xmlwriter
 
 	print_status 'Enabling PHP and Apache modules...'
 	# a2enmod is idempotent and self-appends the needed LoadModule line, so
@@ -948,6 +980,12 @@ setup_suse(){
 	for module in php8 rewrite ssl mod_ssl; do
 		run_cmd a2enmod "$module"
 	done
+
+	if [[ "${VER}" = "${SLES_15_SUPPORTED_SP}"* ]]; then
+		print_status 'Enabling Rewrite Module for Apache...'
+		grep -qF 'mod_rewrite.so' /etc/apache2/loadmodule.conf 2>/dev/null || \
+			echo 'LoadModule rewrite_module         /usr/lib64/apache2-prefork/mod_rewrite.so' >> /etc/apache2/loadmodule.conf
+	fi
 
 	print_status 'Setting up SimpleRisk Virtual Host and SSL Self-Signed Cert'
 	grep -qxF 'Listen 443' /etc/apache2/vhosts.d/simplerisk.conf 2>/dev/null || echo 'Listen 443' >> /etc/apache2/vhosts.d/simplerisk.conf
