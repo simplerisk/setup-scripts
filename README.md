@@ -2,6 +2,12 @@
 
 [![SimpleRisk Install/Uninstall Tests](https://github.com/simplerisk/setup-scripts/actions/workflows/install-test.yml/badge.svg)](https://github.com/simplerisk/setup-scripts/actions/workflows/install-test.yml)
 
+> [!NOTE]
+> **This repository is a read-only publish mirror.** `simplerisk-setup.sh` and this README are published here
+> automatically from SimpleRisk's internal development repository whenever they change. Development and testing
+> happen there, and pull requests opened here cannot be merged: any change committed directly to this repository would
+> be overwritten by the next sync. To report a problem or request a change, please open an issue.
+
 ## Supported versions
 
 - Ubuntu LTS 22.04, 24.04, and 26.04
