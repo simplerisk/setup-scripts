@@ -144,17 +144,36 @@ require_sles_min_sp(){
 	fi
 }
 
+# The Ubuntu releases this script is tested on in CI. Any other accepted Ubuntu release (see
+# ubuntu_version_accepted) is assumed to work but is not explicitly tested.
+ubuntu_is_tested_lts() {
+	[ "${OS}" = "${UBUNTU_OSVAR}" ] && { [ "${VER}" = '22.04' ] || [ "${VER}" = '24.04' ] || [ "${VER}" = '26.04' ]; }
+}
+
+# True for Ubuntu 22.04 and every release from 24.04 on, interim (non-LTS) releases included.
+# 22.10 through 23.10 are left out: they are end-of-life, their own PHP is older than the 8.3
+# SimpleRisk requires, and the Sury repository publishes nothing for them.
+ubuntu_version_accepted() {
+	local ver_num
+	[[ "${VER}" =~ ^([0-9]+)\.([0-9]+)$ ]] || return 1
+	ver_num=$(( 10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]} ))
+	[ "${ver_num}" -eq 2204 ] || [ "${ver_num}" -ge 2404 ]
+}
+
 validate_os_and_version(){
 	local valid
 	local untested_note
 	case "${OS}" in
 		"${UBUNTU_OSVAR}")
-			# LTS releases only - interim (non-LTS) releases like 25.04/25.10
-			# get ~9 months of upstream support and churn every 6 months, so
-			# they're intentionally not accepted here.
-			if [ "${VER}" = '22.04' ] || [[ "${VER}" = 24.* ]] || [[ "${VER}" = 26.* ]]; then
+			# LTS releases (22.04, 24.04, 26.04) are tested in CI. Interim (non-LTS)
+			# releases such as 24.10, 25.04, 25.10 or 26.10 are not blocked: they are
+			# accepted on the assumption that they work, but are not explicitly tested.
+			if ubuntu_version_accepted; then
 				valid=y
 				SETUP_TYPE=debian
+				if ! ubuntu_is_tested_lts; then
+					untested_note="Ubuntu ${VER} is not explicitly tested; only the LTS releases (22.04, 24.04 and 26.04) are. It is accepted on the assumption that it works - see the README."
+				fi
 			fi;;
 		"${DEBIAN_OSVAR}")
 			if [ "${VER}" = '13' ]; then
@@ -355,7 +374,9 @@ set_up_database() {
 	fi
 	exec_cmd "mysql -uroot mysql -e 'CREATE DATABASE simplerisk'${password_flag:-}"
 	exec_cmd "mysql -uroot mysql -e \"CREATE USER 'simplerisk'@'localhost' IDENTIFIED BY '${MYSQL_SIMPLERISK_PASSWORD}'\"${password_flag:-}"
-	exec_cmd "mysql -uroot simplerisk -e '\\. /var/www/simplerisk/database.sql'${password_flag:-}"
+	# Import through stdin rather than `-e '\. file'`: the MySQL 9.x client (Ubuntu 26.10 ships 9.7) rejects the
+	# `\.` shorthand in -e mode ("Unknown command '\.'"), while redirecting a file works with every client.
+	exec_cmd "mysql -uroot simplerisk${password_flag:-} < /var/www/simplerisk/database.sql"
 	exec_cmd "mysql -uroot simplerisk -e \"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER ON simplerisk.* TO 'simplerisk'@'localhost'\"${password_flag:-}"
 	exec_cmd "mysql -u root mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEW_MYSQL_ROOT_PASSWORD}'\"${password_flag:-}"
 
@@ -582,23 +603,38 @@ setup_ubuntu_debian(){
 	if [ "${OS}" = "${DEBIAN_OSVAR}" ] || [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		run_cmd mkdir -p /etc/apt/keyrings
 		local apt_php_version=8.5
+		local use_sury=y
 
-		print_status 'Install gnupg to handle keyrings...'
-		run_cmd apt-get install -y gnupg
-
-		print_status "Adding Ondrej's repository with PHP8"
-		# Download the Sury PHP signing key and verify its fingerprint before trusting it.
-		run_cmd curl -fsSL https://packages.sury.org/php/apt.gpg -o /etc/apt/keyrings/sury-php.gpg
-		local sury_expected_fp="15058500A0235D97F5D10063B188E2B695BD4743"
-		local sury_actual_fp
-		sury_actual_fp=$(gpg --no-default-keyring \
-			--keyring /etc/apt/keyrings/sury-php.gpg \
-			--fingerprint --with-colons 2>/dev/null | awk -F: '/^fpr/{print $10; exit}')
-		if [[ "${sury_actual_fp}" != "${sury_expected_fp}" ]]; then
-			rm -f /etc/apt/keyrings/sury-php.gpg
-			print_error_message "Sury PHP GPG key fingerprint mismatch (got '${sury_actual_fp}', expected '${sury_expected_fp}') — aborting."
+		# Sury publishes PHP packages only for the Ubuntu LTS suites (jammy, noble, resolute). On an
+		# interim release it has no suite, and adding it would make `apt-get update` fail, so use the
+		# distribution's own PHP there (its version is checked below). The tested LTS releases keep
+		# the strict behavior: if Sury is unreachable for them the install fails instead of quietly
+		# installing a different PHP.
+		if [ "${OS}" = "${UBUNTU_OSVAR}" ] && ! ubuntu_is_tested_lts \
+			&& ! curl -fsI "https://packages.sury.org/php/dists/$(lsb_release -sc)/InRelease" > /dev/null 2>&1; then
+			use_sury=n
+			apt_php_version=''
+			print_status "packages.sury.org has no PHP packages for Ubuntu ${VER}; using the distribution's PHP instead"
 		fi
-		exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
+
+		if [ "${use_sury}" = y ]; then
+			print_status 'Install gnupg to handle keyrings...'
+			run_cmd apt-get install -y gnupg
+
+			print_status "Adding Ondrej's repository with PHP8"
+			# Download the Sury PHP signing key and verify its fingerprint before trusting it.
+			run_cmd curl -fsSL https://packages.sury.org/php/apt.gpg -o /etc/apt/keyrings/sury-php.gpg
+			local sury_expected_fp="15058500A0235D97F5D10063B188E2B695BD4743"
+			local sury_actual_fp
+			sury_actual_fp=$(gpg --no-default-keyring \
+				--keyring /etc/apt/keyrings/sury-php.gpg \
+				--fingerprint --with-colons 2>/dev/null | awk -F: '/^fpr/{print $10; exit}')
+			if [[ "${sury_actual_fp}" != "${sury_expected_fp}" ]]; then
+				rm -f /etc/apt/keyrings/sury-php.gpg
+				print_error_message "Sury PHP GPG key fingerprint mismatch (got '${sury_actual_fp}', expected '${sury_expected_fp}') — aborting."
+			fi
+			exec_cmd "echo 'deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main' | sudo tee /etc/apt/sources.list.d/sury-php.list"
+		fi
 
 		if [ "${OS}" = "${DEBIAN_OSVAR}" ]; then
 			print_status 'Adding MySQL 8 repository'
@@ -631,6 +667,15 @@ setup_ubuntu_debian(){
 
 	print_status 'Installing PHP...'
 	run_cmd apt-get install -y "php${apt_php_version:-}" "php${apt_php_version:-}-mysql" "libapache2-mod-php${apt_php_version:-}"
+
+	if [ -z "${apt_php_version:-}" ]; then
+		local distro_php_version
+		distro_php_version=$(get_installed_php_version)
+		if [ "$(printf '%s\n' 8.3 "${distro_php_version}" | sort -V | head -n 1)" != '8.3' ]; then
+			print_error_message "${OS} ${VER} ships PHP ${distro_php_version}, but SimpleRisk requires PHP 8.3 or newer."
+		fi
+		print_status "Using the distribution's PHP ${distro_php_version}"
+	fi
 
 	if [ "${OS}" = "${UBUNTU_OSVAR}" ]; then
 		print_status 'Installing cron...'

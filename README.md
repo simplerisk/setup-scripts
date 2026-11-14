@@ -11,7 +11,10 @@
 ## Supported versions
 
 - Ubuntu LTS 22.04, 24.04, and 26.04
-  - Interim (non-LTS) Ubuntu releases are not supported; they get ~9 months of upstream support and churn every 6 months
+  - Interim (non-LTS) Ubuntu releases (for example 24.10, 25.04, 25.10 or 26.10) are not blocked: the installer accepts any
+    Ubuntu release from 24.04 on and assumes it works, but **only the LTS releases are explicitly tested**. The installer
+    prints a note when it runs on an untested release. The Sury PHP repository publishes packages for the LTS releases
+    only, so on an interim release the installer uses the distribution's own PHP instead, which must be 8.3 or newer.
 - Debian 13
 - CentOS Stream 9, 10
 - Red Hat Enterprise Linux (RHEL) 9, 10
@@ -41,6 +44,8 @@
 | Ubuntu 22.04, 24.04, 26.04; Debian 13; CentOS Stream 9, 10; openSUSE Leap 16.0; SLES 16.0 | Docker containers on GitHub-hosted runners | Install, then a verification script (files, configuration, database, cron, web server, and the application's own health check after creating the admin account), then uninstall and its verification |
 | RHEL 9, 10; SLES 15 SP7 | Real instances in SimpleRisk's private CI (these need a paid subscription) | Install, then `https://localhost` must answer 200. Uninstall is not exercised |
 
+Interim (non-LTS) Ubuntu releases are in neither row: the installer accepts them, but they are not tested.
+
 ## Architecture
 
 The container tests run on **x86_64**. Of the real-instance tests, SLES 15 runs on **x86_64** and RHEL 9 and 10 run on
@@ -59,8 +64,8 @@ A few versions are excluded on purpose, not simply because they haven't been tri
   and Leap 15.6, the last 15.x release, is now end-of-life.
 - **SUSE Linux Enterprise Server (SLES) 15 SP6 and earlier** - capped at PHP 8.2 or older, below SimpleRisk's PHP >= 8.3
   requirement.
-- **Ubuntu releases older than 22.04** (18.04, 20.04, etc.), and interim (non-LTS) releases - see the LTS-only policy
-  above.
+- **Ubuntu releases older than 22.04** (18.04, 20.04, etc.), and the end-of-life interim releases 22.10 through 23.10 -
+  their own PHP is older than SimpleRisk's 8.3 minimum and the Sury repository has no packages for them.
 - **Debian releases older than 13** (11, 12, etc.) - out of scope; only the version listed above is targeted.
 - **CentOS Stream / RHEL releases older than 9** (8, 7, etc.) - out of scope; CentOS 8 reached end-of-life in December
   2021, and older major versions aren't targeted regardless of a given release's own support status.
