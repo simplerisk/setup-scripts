@@ -9,23 +9,39 @@
 - Debian 13
 - CentOS Stream 9, 10
 - Red Hat Enterprise Linux (RHEL) 9, 10
-  - RHEL shares the exact same install code path as CentOS Stream (see `setup_centos_rhel` in `simplerisk-setup.sh`), which
-    *is* covered by CI below, but RHEL itself isn't independently tested: Red Hat's official container images require a
+  - RHEL shares the exact same install code path as CentOS Stream (see `setup_centos_rhel` in `simplerisk-setup.sh`),
+    which is tested in containers (see [How this is tested](#how-this-is-tested)). Red Hat's container images require a
     paid subscription, and the free UBI images can't substitute because `firewalld` and `sendmail`, both of which the
-    script installs, aren't published to any repo UBI can reach without one.
+    script installs, aren't published to any repo UBI can reach without one, so RHEL itself is installed on real
+    RHEL 9 and 10 instances in SimpleRisk's private CI instead.
 - openSUSE Leap 16.0
   - Leap 16.0 ships PHP 8.4 natively; a real MySQL Community Server RPM (built for SLES 15) installs and runs on it
     without issue - see `setup_suse`/`uninstall_suse` in `simplerisk-setup.sh`.
 - SUSE Linux Enterprise Server (SLES) 15 SP7 or later
   - SLES 15 SP7 is the first service pack whose Web and Scripting module ships PHP 8.3 (SimpleRisk requires PHP 8.3+);
     SP6 and earlier ship PHP 8.2 or older and are rejected. It requires an active SUSE subscription with the Web and
-    Scripting module activated via `suseconnect`, so it is verified on a real SLES 15 SP7 instance in SimpleRisk's
-    private CI rather than in this repository's public CI.
+    Scripting module activated via `suseconnect`, so it is verified on a real SLES 15 SP7 (x86_64) instance in SimpleRisk's
+    private CI rather than in a public container.
 - SUSE Linux Enterprise Server (SLES) 16.0
   - SLES 16.0 and openSUSE Leap 16.0 share the exact same package builds (`setup_suse`/`uninstall_suse` is one code path
     for both), and unlike RHEL, SLES 16 *is* independently tested: SUSE's free, unauthenticated BCI (Base Container
     Image) - `registry.suse.com/bci/bci-base:16.0` - carries its own public `SLE_BCI` repo with no SCC subscription
     needed, so CI runs the real installer against real SLES 16, not just its openSUSE proxy.
+
+## How this is tested
+
+| Platforms | Where | What is checked |
+|---|---|---|
+| Ubuntu 22.04, 24.04, 26.04; Debian 13; CentOS Stream 9, 10; openSUSE Leap 16.0; SLES 16.0 | Docker containers on GitHub-hosted runners | Install, then a verification script (files, configuration, database, cron, web server, and the application's own health check after creating the admin account), then uninstall and its verification |
+| RHEL 9, 10; SLES 15 SP7 | Real instances in SimpleRisk's private CI (these need a paid subscription) | Install, then `https://localhost` must answer 200. Uninstall is not exercised |
+
+## Architecture
+
+The container tests run on **x86_64**. Of the real-instance tests, SLES 15 runs on **x86_64** and RHEL 9 and 10 run on
+**arm64** (AWS Graviton); the RHEL install path is also exercised on x86_64 through the CentOS Stream containers.
+SUSE-based systems (SLES, openSUSE Leap) are **x86_64 only**: MySQL does not publish a Community Server repository for
+SLES 15 or 16 on aarch64, so the installer cannot complete there. Ubuntu, Debian and CentOS Stream on arm64 are not
+tested.
 
 ## Explicitly unsupported versions
 
