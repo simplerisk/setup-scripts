@@ -877,6 +877,14 @@ EOF
 	print_status 'Opening Firewall for HTTP/HTTPS traffic'
 	run_cmd systemctl enable firewalld
 	run_cmd systemctl start firewalld
+	# firewalld's D-Bus socket can take a moment to become ready after systemctl
+	# start returns; poll until firewall-cmd --state succeeds (up to 30s).
+	local fw_wait=0
+	until firewall-cmd --state >/dev/null 2>&1; do
+		fw_wait=$((fw_wait + 1))
+		[ "$fw_wait" -ge 30 ] && print_error_message "firewalld did not become ready within 30 seconds."
+		sleep 1
+	done
 	for service in http https ssh; do
 		run_cmd firewall-cmd --permanent --zone=public "--add-service=${service}"
 	done
@@ -1110,6 +1118,12 @@ EOF
 	run_cmd zypper -n install firewalld
 	run_cmd systemctl enable firewalld
 	run_cmd systemctl start firewalld
+	local fw_wait=0
+	until firewall-cmd --state >/dev/null 2>&1; do
+		fw_wait=$((fw_wait + 1))
+		[ "$fw_wait" -ge 30 ] && print_error_message "firewalld did not become ready within 30 seconds."
+		sleep 1
+	done
 	for service in http https ssh; do
 		run_cmd firewall-cmd --permanent --zone=public "--add-service=${service}"
 	done
