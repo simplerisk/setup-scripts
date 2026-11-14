@@ -444,7 +444,10 @@ set_up_simplerisk() {
 	run_cmd wget -O /var/www/simplerisk/database.sql "https://github.com/simplerisk/database/raw/master/simplerisk-en-${2}.sql"
 	verify_sha256 /var/www/simplerisk/database.sql "$SIMPLERISK_DB_SHA256"
 	run_cmd cp /var/www/simplerisk/includes/config.sample.php /var/www/simplerisk/includes/config.php
-	run_cmd chown -R "${1}:" /var/www/simplerisk
+	# Name the group explicitly (the account's primary group) instead of the bare "user:" form. The bare form
+	# means "the user's login group" in GNU chown, but the Rust coreutils that Ubuntu 26.04 ships leave the
+	# group as root, so the application would belong to the wrong group there.
+	run_cmd chown -R "${1}:$(id -gn "${1}")" /var/www/simplerisk
 	# Log directory/file creation, ownership, and permissions are handled by
 	# set_up_simplerisk_log(), called by each OS setup function.
 }
@@ -471,7 +474,7 @@ set_up_simplerisk_log() {
 	print_status 'Creating SimpleRisk log directory and file...'
 	run_cmd mkdir -p /var/log/simplerisk
 	run_cmd touch /var/log/simplerisk/simplerisk.log
-	run_cmd chown -R "${1}:" /var/log/simplerisk
+	run_cmd chown -R "${1}:$(id -gn "${1}")" /var/log/simplerisk
 	run_cmd chmod 750 /var/log/simplerisk
 	run_cmd chmod 640 /var/log/simplerisk/simplerisk.log
 }
