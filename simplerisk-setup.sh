@@ -562,11 +562,30 @@ bail() {
 	print_error_message 'The command exited with failure. Verify the command output or run the script in debug mode (-d|--debug).'
 }
 
+# Waits (bounded) for a backup run that cron already started to finish. The job runs every minute, so a run can
+# be in flight when the uninstall starts; if it is still running when /var/log/simplerisk is deleted it writes
+# its log again and recreates the directory, leaving it behind after a "successful" uninstall.
+wait_for_backup_cron_to_exit() {
+	local waited=0
+	# pgrep is not guaranteed on minimal images; without it there is nothing to wait on.
+	command -v pgrep > /dev/null 2>&1 || return 0
+	while pgrep -f 'simplerisk/cron/cron.php' > /dev/null 2>&1; do
+		if [ "${waited}" -ge 60 ]; then
+			print_status 'A SimpleRisk backup run is still active after 60 seconds; continuing the uninstall.'
+			return 0
+		fi
+		sleep 1
+		waited=$((waited + 1))
+	done
+}
+
 remove_backup_cronjob() {
 	run_cmd_nobail rm -f /etc/cron.d/simplerisk
 	# Also strip any legacy root-crontab entry left by installs from before
 	# the cron job was moved to run as the web-server account.
 	(crontab -l 2>/dev/null | grep -v 'simplerisk/cron/cron.php') | crontab - 2>/dev/null || true
+	# The entry is gone, so no new run starts; let one that already started finish.
+	wait_for_backup_cron_to_exit
 }
 
 get_mysql_root_password() {
