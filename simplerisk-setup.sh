@@ -951,6 +951,27 @@ EOF
 	run_cmd chcon -R -t httpd_log_t /var/log/simplerisk
 }
 
+# SLES 16 enforces SELinux by default (SLES 15 and openSUSE use AppArmor, or nothing, so there is nothing to do there).
+# Without these settings every page answers 403 (Apache may not read /var/www's generic label), and after that the
+# application cannot reach MySQL ("Database connection failed: Permission denied"). Skipped when SELinux is absent
+# or disabled, which is the case in the CI containers.
+configure_suse_selinux() {
+	command -v getenforce > /dev/null 2>&1 || return 0
+	[ "$(getenforce 2> /dev/null)" = 'Disabled' ] && return 0
+
+	print_status 'Configuring SELinux for SimpleRisk...'
+	if command -v semanage > /dev/null 2>&1; then
+		# Persistent file-context rules, so a later relabel of the filesystem keeps them.
+		run_cmd semanage fcontext -a -t httpd_sys_rw_content_t '/var/www/simplerisk(/.*)?'
+		run_cmd semanage fcontext -a -t httpd_log_t '/var/log/simplerisk(/.*)?'
+		run_cmd restorecon -R /var/www/simplerisk /var/log/simplerisk
+	else
+		run_cmd chcon -R -t httpd_sys_rw_content_t /var/www/simplerisk
+		run_cmd chcon -R -t httpd_log_t /var/log/simplerisk
+	fi
+	run_cmd setsebool -P httpd_can_network_connect=1
+}
+
 setup_suse(){
 	print_status "Running SimpleRisk ${1} installer..."
 
@@ -1124,6 +1145,7 @@ EOF
 
 	set_up_simplerisk 'wwwrun' "${1}"
 	set_up_simplerisk_log 'wwwrun'
+	configure_suse_selinux
 
 	print_status 'Restarting Apache to load the new configuration...'
 	run_cmd systemctl restart apache2
@@ -1289,6 +1311,10 @@ uninstall_suse(){
 	run_cmd_nobail systemctl disable mysql
 
 	print_status 'Removing SimpleRisk application and log files...'
+	if command -v semanage > /dev/null 2>&1; then
+		run_cmd_nobail semanage fcontext -d '/var/www/simplerisk(/.*)?'
+		run_cmd_nobail semanage fcontext -d '/var/log/simplerisk(/.*)?'
+	fi
 	run_cmd_nobail rm -rf /var/www/simplerisk
 	run_cmd_nobail rm -rf /var/log/simplerisk
 
