@@ -35,20 +35,21 @@
   - SLES 16.0 and openSUSE Leap 16.0 share the exact same package builds (`setup_suse`/`uninstall_suse` is one code path
     for both), and unlike RHEL, SLES 16 *is* independently tested: SUSE's free, unauthenticated BCI (Base Container
     Image) - `registry.suse.com/bci/bci-base:16.0` - carries its own public `SLE_BCI` repo with no SCC subscription
-    needed, so CI runs the real installer against real SLES 16, not just its openSUSE proxy.
+    needed, so CI runs the real installer against real SLES 16, not just its openSUSE proxy. It is also installed on a real
+    SLES 16 instance, because SLES 16 enforces SELinux and a container does not.
 
 ## How this is tested
 
 | Platforms | Where | What is checked |
 |---|---|---|
 | Ubuntu 22.04, 24.04, 26.04; Debian 13; CentOS Stream 9, 10; openSUSE Leap 16.0; SLES 16.0 | Docker containers on GitHub-hosted runners | Install, then a verification script (files, configuration, database, cron, web server, and the application's own health check after creating the admin account), then uninstall and its verification |
-| RHEL 9, 10; SLES 15 SP7 | Real instances in SimpleRisk's private CI (these need a paid subscription) | Install, then `https://localhost` must answer 200. Uninstall is not exercised |
+| RHEL 9, 10; SLES 15 SP7; SLES 16 | Real instances in SimpleRisk's private CI (RHEL and SLES 15 need a paid subscription; SLES 16 runs on one too so that SELinux, which is enforcing there, is exercised) | Install, then `https://localhost` must answer 200. Uninstall is not exercised |
 
 Interim (non-LTS) Ubuntu releases are in neither row: the installer accepts them, but they are not tested.
 
 ## Architecture
 
-The container tests run on **x86_64**. Of the real-instance tests, SLES 15 runs on **x86_64** and RHEL 9 and 10 run on
+The container tests run on **x86_64**. Of the real-instance tests, SLES 15 and SLES 16 run on **x86_64** and RHEL 9 and 10 run on
 **arm64** (AWS Graviton); the RHEL install path is also exercised on x86_64 through the CentOS Stream containers.
 SUSE-based systems (SLES, openSUSE Leap) are **x86_64 only**: MySQL does not publish a Community Server repository for
 SLES 15 or 16 on aarch64, so the installer cannot complete there. Ubuntu, Debian and CentOS Stream on arm64 are not
